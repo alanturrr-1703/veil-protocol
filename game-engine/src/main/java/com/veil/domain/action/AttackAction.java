@@ -1,0 +1,101 @@
+package com.veil.domain.action;
+
+import com.veil.domain.npc.NPC;
+import com.veil.domain.npc.Observation;
+import com.veil.domain.player.Faction;
+import com.veil.domain.player.Player;
+import com.veil.domain.roles.ShadowRole;
+import com.veil.domain.world.Location;
+import com.veil.engine.GameContext;
+import com.veil.events.AttackEvent;
+import com.veil.events.EventBus;
+import com.veil.events.NPCDeathEvent;
+import com.veil.phases.GamePhaseType;
+
+/**
+ * Shadow eliminates a target. A target player survives if shielded. A target NPC
+ * can only be hunted if the Shadow is within hunt radius and still has attempts left.
+ * Surviving NPCs in the location witness the attack (append to their memory).
+ */
+public class AttackAction implements GameAction {
+
+    public static final int PRIORITY = 20;
+
+    private final String actorId;
+    private final String targetId;
+
+    public AttackAction(String actorId, String targetId) {
+        this.actorId = actorId;
+        this.targetId = targetId;
+    }
+
+    @Override public String actorId() { return actorId; }
+    @Override public GamePhaseType requiredPhase() { return GamePhaseType.NIGHT; }
+    @Override public int priority() { return PRIORITY; }
+
+    @Override
+    public boolean validate(GameContext ctx) {
+        Player attacker = ctx.players().get(actorId);
+        if (attacker == null || !attacker.status().isAlive()) return false;
+        if (attacker.role().faction() != Faction.SHADOW) return false;
+        return ctx.players().containsKey(targetId) || ctx.npcs().containsKey(targetId);
+    }
+
+    @Override
+    public void execute(GameContext ctx, EventBus bus) {
+        Player attacker = ctx.players().get(actorId);
+
+        // Target is another player.
+        Player targetPlayer = ctx.players().get(targetId);
+        if (targetPlayer != null) {
+            boolean blocked = targetPlayer.status().isProtectedThisNight();
+            if (!blocked) {
+                targetPlayer.status().kill();
+                Location loc = ctx.city().location(targetPlayer.locationId());
+                if (loc != null) loc.removePlayer(targetPlayer.id());
+                witnessAttack(ctx, targetPlayer.locationId(), targetPlayer.id());
+            }
+            bus.publish(new AttackEvent(ctx.tick(), actorId, targetId, blocked));
+            return;
+        }
+
+        // Target is an NPC witness — requires proximity and a remaining attempt.
+        NPC targetNpc = ctx.npcs().get(targetId);
+        if (targetNpc == null || !targetNpc.isAlive()) return;
+
+        ShadowRole shadow = (ShadowRole) attacker.role();
+        boolean hasAttempt = ctx.privateState().tryConsumeHuntAttempt(actorId, shadow.maxHuntAttempts());
+        if (!hasAttempt) return;
+
+        boolean inRange = withinHuntRadius(ctx, attacker, targetNpc, shadow.huntRadius());
+        if (!inRange) return;
+
+        if (targetNpc.isProtected()) {
+            bus.publish(new AttackEvent(ctx.tick(), actorId, targetId, true));
+            return;
+        }
+
+        targetNpc.eliminate();
+        Location loc = ctx.city().location(targetNpc.locationId());
+        if (loc != null) loc.removeNpc(targetNpc.id());
+        bus.publish(new NPCDeathEvent(ctx.tick(), actorId, targetId, targetNpc.locationId()));
+    }
+
+    private boolean withinHuntRadius(GameContext ctx, Player attacker, NPC npc, double radius) {
+        Location from = ctx.city().location(attacker.locationId());
+        Location to = ctx.city().location(npc.locationId());
+        if (from == null || to == null) return false;
+        return from.position().distanceTo(to.position()) <= radius;
+    }
+
+    private void witnessAttack(GameContext ctx, String locationId, String victimId) {
+        Location loc = ctx.city().location(locationId);
+        if (loc == null) return;
+        for (String npcId : loc.npcIds()) {
+            NPC npc = ctx.npcs().get(npcId);
+            if (npc != null && npc.isAlive()) {
+                npc.witness(new Observation(victimId, "was attacked", locationId, ctx.tick(), 0.9));
+            }
+        }
+    }
+}

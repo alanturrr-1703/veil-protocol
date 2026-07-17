@@ -1,0 +1,71 @@
+package com.veil.state;
+
+import com.veil.domain.action.GameAction;
+import com.veil.domain.npc.Observation;
+import com.veil.domain.player.Faction;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Confidential state. Roles, NPC memories (held on NPCs), the night action queue,
+ * investigation results, and hunt budgets live here. Nothing in this class is ever
+ * serialized to a client directly; only the redaction boundary may read from it, and
+ * only the slice belonging to a specific viewer.
+ */
+public class PrivateState {
+
+    private final List<GameAction> queuedNightActions = new ArrayList<>();
+    private final Map<String, Map<String, Faction>> investigations = new HashMap<>();
+    private final Map<String, Map<String, List<Observation>>> npcAnswers = new HashMap<>();
+    private final Map<String, Integer> huntAttemptsRemaining = new HashMap<>();
+
+    // --- Night action queue -------------------------------------------------
+
+    public void queueAction(GameAction action) {
+        queuedNightActions.add(action);
+    }
+
+    public List<GameAction> drainQueuedActions() {
+        List<GameAction> drained = new ArrayList<>(queuedNightActions);
+        queuedNightActions.clear();
+        return drained;
+    }
+
+    // --- Oracle investigations ---------------------------------------------
+
+    public void recordInvestigation(String oracleId, String targetId, Faction reading) {
+        investigations.computeIfAbsent(oracleId, k -> new LinkedHashMap<>()).put(targetId, reading);
+    }
+
+    public Map<String, Faction> investigationResults(String oracleId) {
+        return investigations.getOrDefault(oracleId, Map.of());
+    }
+
+    // --- NPC answers --------------------------------------------------------
+
+    public void recordNpcAnswer(String askerId, String npcId, List<Observation> answer) {
+        npcAnswers.computeIfAbsent(askerId, k -> new LinkedHashMap<>()).put(npcId, answer);
+    }
+
+    public Map<String, List<Observation>> npcAnswers(String askerId) {
+        return npcAnswers.getOrDefault(askerId, Map.of());
+    }
+
+    // --- Shadow hunt budget -------------------------------------------------
+
+    /** Returns true and decrements if the shadow still has hunt attempts left. */
+    public boolean tryConsumeHuntAttempt(String shadowId, int max) {
+        int remaining = huntAttemptsRemaining.getOrDefault(shadowId, max);
+        if (remaining <= 0) return false;
+        huntAttemptsRemaining.put(shadowId, remaining - 1);
+        return true;
+    }
+
+    public int huntAttemptsRemaining(String shadowId, int max) {
+        return huntAttemptsRemaining.getOrDefault(shadowId, max);
+    }
+}
