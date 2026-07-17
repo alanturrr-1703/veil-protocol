@@ -24,7 +24,18 @@ public class NPCAgent {
         this.promptBuilder = promptBuilder;
     }
 
+    private static final String[] ROLE_WORDS = {
+            "shadow", "oracle", "aegis", "citizen", "role", "faction", "alignment", "traitor"
+    };
+
     public String answer(NPC npc, String askerId, String topic) {
+        // NPCs never know roles. A role/faction question is refused outright, regardless
+        // of memory — the NPC can only ever speak to what it witnessed.
+        if (isRoleQuestion(topic)) {
+            return npc.displayName() + " frowns. \"I've no idea who's a Shadow or what "
+                    + "anyone truly is. I can only tell you what I saw with my own eyes.\"";
+        }
+
         List<Observation> shareable = npc.recall(topic, askerId);
         String key = npc.id() + "|" + askerId + "|" + topic + "|v" + npc.memory().version();
 
@@ -37,5 +48,14 @@ public class NPCAgent {
 
         cache.put(key, reply);
         return reply;
+    }
+
+    private static boolean isRoleQuestion(String topic) {
+        if (topic == null) return false;
+        String t = topic.toLowerCase();
+        for (String w : ROLE_WORDS) {
+            if (t.contains(w)) return true;
+        }
+        return false;
     }
 }

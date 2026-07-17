@@ -59,7 +59,7 @@ public final class Demo {
         engine.advancePhase();                              // resolve night -> Day
 
         System.out.println("=== DAY 1 ===");
-        engine.submit(new QueryNPCAction("p3", "n1", "p4", GamePhaseType.DAY)); // ask witness about Dax
+        engine.submit(new QueryNPCAction("p3", "n1", "last night", GamePhaseType.DAY)); // ask what the witness saw
         engine.advancePhase();                              // Day -> Voting
 
         System.out.println("=== VOTING 1 ===");
@@ -77,7 +77,11 @@ public final class Demo {
 
         // NPC dialogue via the AI layer (falls back to deterministic text with no Ollama).
         NPCAgent agent = new NPCAgent(new OllamaClient(), new PromptBuilder());
-        String reply = agent.answer(ctx.npcs().get("n1"), "p3", "p4");
-        System.out.println("\n=== NPC DIALOGUE ===\n  " + reply);
+        NPC witness = ctx.npcs().get("n1");
+        System.out.println("\n=== NPC DIALOGUE ===");
+        System.out.println("  Q: \"What did you see last night?\"");
+        System.out.println("  A: " + agent.answer(witness, "p3", "last night"));
+        System.out.println("  Q: \"Is p1 the Shadow?\"");
+        System.out.println("  A: " + agent.answer(witness, "p3", "is p1 the shadow"));
     }
 }

@@ -12,6 +12,9 @@ import com.veil.events.EventBus;
 import com.veil.events.NPCDeathEvent;
 import com.veil.phases.GamePhaseType;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Shadow eliminates a target. A target player survives if shielded. A target NPC
  * can only be hunted if the Shadow is within hunt radius and still has attempts left.
@@ -88,13 +91,27 @@ public class AttackAction implements GameAction {
         return from.position().distanceTo(to.position()) <= radius;
     }
 
+    /** Max number of bystanders an NPC will name as possible culprits. */
+    private static final int MAX_SUSPECTS = 3;
+
     private void witnessAttack(GameContext ctx, String locationId, String victimId) {
         Location loc = ctx.city().location(locationId);
         if (loc == null) return;
+
+        // The NPC only saw who was AROUND — never who struck the blow. The victim has
+        // already been removed from the location, so this is the set of bystanders. The
+        // real attacker may or may not be among them; either way it stays a fuzzy guess.
+        List<String> suspects = new ArrayList<>();
+        for (String pid : loc.playerIds()) {
+            if (pid.equals(victimId)) continue;
+            suspects.add(pid);
+            if (suspects.size() >= MAX_SUSPECTS) break;
+        }
+
         for (String npcId : loc.npcIds()) {
             NPC npc = ctx.npcs().get(npcId);
             if (npc != null && npc.isAlive()) {
-                npc.witness(new Observation(victimId, "was attacked", locationId, ctx.tick(), 0.9));
+                npc.witness(new Observation(victimId, "was attacked", locationId, ctx.tick(), 0.9, suspects));
             }
         }
     }
