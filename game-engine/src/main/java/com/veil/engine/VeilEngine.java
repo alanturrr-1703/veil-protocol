@@ -66,6 +66,28 @@ public class VeilEngine {
         return true;
     }
 
+    /**
+     * Free-roam movement, decoupled from the turn engine so players (and AI) can wander the
+     * map in ANY phase — including the lobby, before the match has started. Still validated
+     * (must be alive; districts must be adjacent), just not gated by phase/role.
+     */
+    public boolean moveTo(String playerId, String toLocationId) {
+        com.veil.domain.action.MoveAction a =
+                new com.veil.domain.action.MoveAction(playerId, toLocationId, currentPhaseType());
+        if (!a.validate(context)) return false;
+        a.execute(context, eventBus);
+        return true;
+    }
+
+    /** Free-roam room change (any phase, including the lobby). Validated but not phase-gated. */
+    public boolean enterRoom(String playerId, String roomId) {
+        com.veil.domain.action.EnterRoomAction a =
+                new com.veil.domain.action.EnterRoomAction(playerId, roomId, currentPhaseType());
+        if (!a.validate(context)) return false;
+        a.execute(context, eventBus);
+        return true;
+    }
+
     /** Cast a vote (only meaningful during the Voting phase). */
     public void castVote(String voterId, String targetId) {
         if (currentPhase instanceof VotingPhase voting) {

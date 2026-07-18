@@ -112,6 +112,20 @@ public class GameSession {
         return ok;
     }
 
+    /** Free-roam district move (allowed in any phase, including the lobby). */
+    public synchronized boolean move(String playerId, String toLocationId) {
+        boolean ok = engine.moveTo(playerId, toLocationId);
+        if (ok) broadcast();
+        return ok;
+    }
+
+    /** Free-roam room change (allowed in any phase, including the lobby). */
+    public synchronized boolean enterRoom(String playerId, String roomId) {
+        boolean ok = engine.enterRoom(playerId, roomId);
+        if (ok) broadcast();
+        return ok;
+    }
+
     /** Update a player's free-roam position within their room and re-push co-located views. */
     public synchronized void updatePosition(String playerId, double x, double y) {
         Player p = engine.context().players().get(playerId);

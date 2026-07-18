@@ -5,10 +5,8 @@ import com.veil.api.session.GameService;
 import com.veil.api.session.GameSession;
 import com.veil.chat.ChatChannel;
 import com.veil.domain.action.AttackAction;
-import com.veil.domain.action.EnterRoomAction;
 import com.veil.domain.action.GameAction;
 import com.veil.domain.action.InvestigateAction;
-import com.veil.domain.action.MoveAction;
 import com.veil.domain.action.QueryNPCAction;
 import com.veil.domain.action.ShieldAction;
 import com.veil.phases.GamePhaseType;
@@ -67,8 +65,8 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         GamePhaseType phase = game.phaseType();
 
         switch (intent.type() == null ? "" : intent.type().toUpperCase()) {
-            case "MOVE" -> game.submit(new MoveAction(playerId, intent.toLocationId(), phase));
-            case "ENTER_ROOM" -> game.submit(new EnterRoomAction(playerId, intent.roomId(), phase));
+            case "MOVE" -> game.move(playerId, intent.toLocationId());
+            case "ENTER_ROOM" -> game.enterRoom(playerId, intent.roomId());
             case "ATTACK" -> game.submit(new AttackAction(playerId, intent.targetId()));
             case "SHIELD" -> game.submit(new ShieldAction(playerId, intent.targetId()));
             case "INVESTIGATE" -> game.submit(new InvestigateAction(playerId, intent.targetId()));

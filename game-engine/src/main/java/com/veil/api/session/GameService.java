@@ -53,8 +53,11 @@ public class GameService {
     private final Map<String, GameSession> games = new ConcurrentHashMap<>();
     private final Map<String, Map<String, String>> commitments = new ConcurrentHashMap<>();
     // Per-game countdown that auto-advances the phase, giving the match a live clock.
-    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(4);
     private final Map<String, ScheduledFuture<?>> timers = new ConcurrentHashMap<>();
+    // Per-game loop that makes AI-controlled operatives wander the map (even in the lobby).
+    private final Map<String, ScheduledFuture<?>> wanderers = new ConcurrentHashMap<>();
+    private final java.util.Random rng = new java.util.Random();
 
     public GameService(ConfidentialGateway gateway, LeaderboardListener leaderboard,
                        AiEngine ai, ObjectMapper mapper) {
@@ -130,6 +133,7 @@ public class GameService {
 
         GameSession session = new GameSession(id, engine, mapper);
         games.put(id, session);
+        startWander(id, session);
         return session;
     }
 
@@ -207,6 +211,44 @@ public class GameService {
     private void cancelTimer(String gameId) {
         ScheduledFuture<?> existing = timers.remove(gameId);
         if (existing != null) existing.cancel(false);
+    }
+
+    /**
+     * Keep the city alive: on a steady tick, every AI-controlled operative takes a small
+     * wander — a step within the room, a slip through a door, or a hop to an adjacent
+     * district. Runs from the moment the game is created (the lobby included). Human-claimed
+     * seats are skipped; they move themselves.
+     */
+    private void startWander(String gameId, GameSession session) {
+        ScheduledFuture<?> f = scheduler.scheduleAtFixedRate(
+                () -> wander(session), 1200, 1800, TimeUnit.MILLISECONDS);
+        wanderers.put(gameId, f);
+    }
+
+    private void wander(GameSession session) {
+        try {
+            GameContext ctx = session.context();
+            for (Player p : ctx.players().values()) {
+                if (!p.status().isAlive() || session.isHuman(p.id())) continue;
+                double roll = rng.nextDouble();
+                if (roll < 0.14) {
+                    var neighbors = new java.util.ArrayList<>(ctx.city().neighbors(p.locationId()));
+                    if (!neighbors.isEmpty()) session.move(p.id(), neighbors.get(rng.nextInt(neighbors.size())));
+                } else if (roll < 0.30) {
+                    Location loc = ctx.city().location(p.locationId());
+                    if (loc != null) {
+                        var rooms = new java.util.ArrayList<>(loc.rooms().keySet());
+                        session.enterRoom(p.id(), rooms.get(rng.nextInt(rooms.size())));
+                    }
+                } else {
+                    double nx = p.x() + (rng.nextDouble() - 0.5) * 0.4;
+                    double ny = p.y() + (rng.nextDouble() - 0.5) * 0.4;
+                    session.updatePosition(p.id(), nx, ny);
+                }
+            }
+        } catch (Exception ignored) {
+            // never let a wander hiccup kill the scheduler
+        }
     }
 
     public Map<String, String> commitmentsOf(String gameId) {
