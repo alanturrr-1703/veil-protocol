@@ -170,37 +170,37 @@ sequenceDiagram
     participant C as Player Client
     participant API as GameController
     participant E as VeilEngine
-    participant NP as NightPhase (State)
+    participant NP as NightPhase State
     participant R as GameResolver
     participant D as Domain
     participant PR as PrivateState
     participant B as EventBus
     participant DTO as DTO Assembler
 
-    Note over NP: Phase = NIGHT (actions hidden)
+    Note over NP: Phase = NIGHT, actions hidden
     C->>API: submit AttackAction / ShieldAction / InvestigateAction
-    API->>E: enqueue(command)
-    E->>NP: onCommand(cmd)
+    API->>E: enqueue command
+    E->>NP: onCommand cmd
     NP->>NP: validate cmd allowed this phase + role
     NP->>PR: store command in private action queue
     Note over PR: queued actions are confidential<br/>no client can read them
 
-    Note over E: Night timer expires → resolve
-    E->>NP: resolve()
-    NP->>R: resolve(queuedCommands)
-    R->>R: order by priority (Shield → Attack → Investigate → Move)
-    R->>D: apply ShieldAction (mark protected)
-    R->>D: apply AttackAction (respect shields; hunt NPC in radius)
-    D->>D: MemoryBank updates (NPCs witness the attack)
-    R->>D: apply InvestigateAction (compute partial truth)
-    R->>PR: write investigation results (Oracle-only)
+    Note over E: Night timer expires, resolve
+    E->>NP: resolve
+    NP->>R: resolve queuedCommands
+    R->>R: order by priority Shield, Attack, Investigate, Move
+    R->>D: apply ShieldAction, mark protected
+    R->>D: apply AttackAction, respect shields and hunt NPC in radius
+    D->>D: MemoryBank updates, NPCs witness the attack
+    R->>D: apply InvestigateAction, compute partial truth
+    R->>PR: write investigation results, Oracle-only
     R->>B: emit AttackEvent, NPCEliminatedEvent, EvidenceFoundEvent, PlayerMovedEvent
 
-    B-->>DTO: events (full fidelity)
-    B-->>DTO: replay/analytics/narrator sinks
+    B-->>DTO: events at full fidelity
+    B-->>DTO: replay, analytics, narrator sinks
 
-    E->>NP: transition() → DayPhase
-    DTO->>DTO: project per viewer<br/>(public announcements only + Oracle's own result)
+    E->>NP: transition to DayPhase
+    DTO->>DTO: project per viewer<br/>public announcements plus Oracle's own result
     DTO-->>C: redacted DayPhase view
 ```
 
