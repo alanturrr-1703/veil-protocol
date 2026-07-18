@@ -21,6 +21,7 @@ import { ChatPanel } from "./components/chat/ChatPanel";
 import { Leaderboard } from "./components/game/Leaderboard";
 import { Roster } from "./components/game/Roster";
 import { Interior } from "./components/city/Interior";
+import { RoomScene } from "./components/city/RoomScene";
 import { Countdown } from "./components/game/Countdown";
 import { HologramCard } from "./components/ui/HologramCard";
 
@@ -156,9 +157,14 @@ function GameScreen() {
         </aside>
 
         <main className="flex min-h-[60vh] flex-col gap-4">
-          <HologramCard title="Sector Grid" accent="cyan" className="relative flex-1">
+          <HologramCard title="Sector Grid" accent="cyan" className="relative min-h-[260px] flex-1">
             <div className="absolute inset-3 top-10">
               <NeonMap />
+            </div>
+          </HologramCard>
+          <HologramCard title="Room · Street Level" accent="violet" className="relative h-[240px]">
+            <div className="absolute inset-3 top-10">
+              <RoomScene send={send} />
             </div>
           </HologramCard>
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
