@@ -1,7 +1,6 @@
 import { HologramCard } from "../ui/HologramCard";
 import { useGameState } from "../../hooks/useGameState";
 import { CITY_MAP } from "../../types/Location";
-import type { Intent } from "../../types/Event";
 
 const districtName = (id?: string | null) => CITY_MAP.find((l) => l.id === id)?.name ?? id ?? "—";
 
@@ -10,7 +9,7 @@ const districtName = (id?: string | null) => CITY_MAP.find((l) => l.id === id)?.
  * operatives and NPCs who share your exact room. Duck into a side room to slip out of
  * sight of the commons — and to sniff out anyone (or any NPC) hiding there.
  */
-export function Interior({ send }: { send: (intent: Intent) => void }) {
+export function Interior() {
   const { view, playerId, role } = useGameState();
   if (!view || !view.viewerDistrict) return null;
 
@@ -49,22 +48,9 @@ export function Interior({ send }: { send: (intent: Intent) => void }) {
         )}
       </div>
 
-      <div className="mt-3">
-        <p className="mb-1 text-[10px] uppercase tracking-widest text-slate-500">Slip into a room</p>
-        <div className="flex flex-wrap gap-1.5">
-          {Object.entries(rooms).map(([rid, rname]) => (
-            <button
-              key={rid}
-              disabled={rid === room}
-              onClick={() => send({ type: "ENTER_ROOM", roomId: rid })}
-              className={`btn text-[11px] ${rid === room ? "neon-border text-neon-violet" : ""}`}
-            >
-              {rid === room ? "◉ " : "→ "}
-              {rname}
-            </button>
-          ))}
-        </div>
-      </div>
+      <p className="mt-3 text-[10px] italic text-slate-500">
+        Use the glowing doorways on the room stage to move between rooms.
+      </p>
 
       {mustRelocate && (
         <p className="mt-3 text-[11px] text-neon-pink">

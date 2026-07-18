@@ -26,6 +26,16 @@ const py = (y: number) => AY0 + (AY1 - AY0) * y;
 const WHISPER_RANGE = 0.18;
 const SPEED = 0.55; // arena-widths per second
 
+// Where exits sit on the walls, in normalized arena coords. Walk into one (or click it) to
+// travel to that room. The arrow hints the direction of the path.
+const DOOR_SLOTS = [
+  { nx: 0.02, ny: 0.5, arrow: "◄", edge: "left" },
+  { nx: 0.98, ny: 0.5, arrow: "►", edge: "right" },
+  { nx: 0.5, ny: 0.97, arrow: "▼", edge: "bottom" },
+  { nx: 0.5, ny: 0.06, arrow: "▲", edge: "top" },
+];
+const DOOR_RANGE = 0.08;
+
 const districtName = (id?: string | null) => CITY_MAP.find((l) => l.id === id)?.name ?? id ?? "—";
 
 interface Person {
@@ -64,7 +74,18 @@ export function RoomScene({ send }: { send: (intent: Intent) => void }) {
   const lastSent = useRef({ x: -1, y: -1, t: 0 });
   const sendRef = useRef(send);
   sendRef.current = send;
+  const doorsRef = useRef<{ rid: string; name: string; nx: number; ny: number; arrow: string; edge: string }[]>([]);
+  const lastEnter = useRef(0);
   const iAmAlive = playerId ? (view?.roster?.[playerId] ?? true) : false;
+
+  const currentRoom = view?.viewerRoom ?? "commons";
+  const doors = useMemo(() => {
+    const rooms = view?.rooms ?? {};
+    return Object.entries(rooms)
+      .filter(([rid]) => rid !== currentRoom)
+      .map(([rid, name], i) => ({ rid, name, ...DOOR_SLOTS[i % DOOR_SLOTS.length] }));
+  }, [view?.rooms, currentRoom]);
+  doorsRef.current = doors;
 
   // Teleport my marker to the server position whenever I change room/district.
   useEffect(() => {
@@ -117,6 +138,17 @@ export function RoomScene({ send }: { send: (intent: Intent) => void }) {
           me.current.x = Math.max(0, Math.min(1, me.current.x + (dx / len) * SPEED * dt));
           me.current.y = Math.max(0, Math.min(1, me.current.y + (dy / len) * SPEED * dt));
           setMeRender({ x: me.current.x, y: me.current.y });
+
+          // walk into a doorway to travel to that room
+          if (now - lastEnter.current > 900) {
+            for (const dr of doorsRef.current) {
+              if (Math.hypot(me.current.x - dr.nx, me.current.y - dr.ny) < DOOR_RANGE) {
+                lastEnter.current = now;
+                sendRef.current({ type: "ENTER_ROOM", roomId: dr.rid });
+                break;
+              }
+            }
+          }
         }
       }
       // send at ~12Hz when moved
@@ -322,6 +354,56 @@ export function RoomScene({ send }: { send: (intent: Intent) => void }) {
               {p.kind === "self" && <span className="ml-1 text-[8px] opacity-70">YOU</span>}
               {p.kind === "npc" && <span className="ml-1 text-[8px] opacity-70">NPC</span>}
               {p.kind === "ai" && <span className="ml-1 text-[8px] opacity-70">AI</span>}
+            </span>
+          </button>
+        );
+      })}
+
+      {/* faint paths from the room centre to each exit */}
+      {doors.length > 0 && (
+        <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+          {doors.map((dr) => (
+            <line
+              key={dr.rid}
+              x1={50}
+              y1={60}
+              x2={px(dr.nx)}
+              y2={py(dr.ny)}
+              stroke="#a855f7"
+              strokeWidth={0.4}
+              strokeDasharray="1.5 1.5"
+              opacity={0.35}
+            />
+          ))}
+        </svg>
+      )}
+
+      {/* exits / doorways to the other rooms in this district */}
+      {doors.map((dr) => {
+        const near = Math.hypot(meRender.x - dr.nx, meRender.y - dr.ny) < DOOR_RANGE * 2.2;
+        return (
+          <button
+            key={dr.rid}
+            onClick={() => send({ type: "ENTER_ROOM", roomId: dr.rid })}
+            className={`group absolute z-10 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center outline-none transition ${near ? "scale-110" : ""}`}
+            style={{ left: `${px(dr.nx)}%`, top: `${py(dr.ny)}%` }}
+            title={`Enter ${dr.name}`}
+          >
+            <div
+              className="flex items-center gap-1 rounded-md border px-2 py-1 backdrop-blur"
+              style={{
+                borderColor: near ? "#c4b5fd" : "rgba(168,85,247,0.5)",
+                background: "rgba(10,6,24,0.7)",
+                boxShadow: near ? "0 0 12px rgba(168,85,247,0.6)" : "none",
+              }}
+            >
+              <span className="text-xs text-neon-violet">{dr.arrow}</span>
+              <span className="whitespace-nowrap text-[10px] font-semibold text-neon-violet group-hover:text-white">
+                {dr.name}
+              </span>
+            </div>
+            <span className="mt-0.5 text-[8px] uppercase tracking-widest text-slate-500">
+              {near ? "walk in / click" : "exit"}
             </span>
           </button>
         );

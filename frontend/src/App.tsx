@@ -178,7 +178,7 @@ function GameScreen() {
         </main>
 
         <aside className="space-y-4">
-          <Interior send={send} />
+          <Interior />
           <NPCDialogue send={send} />
           <EvidenceBoard />
           <Leaderboard refreshKey={leaderboardBump} />
