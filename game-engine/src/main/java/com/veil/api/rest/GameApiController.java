@@ -40,19 +40,26 @@ public class GameApiController {
         );
     }
 
-    @PostMapping("/{id}/start")
-    public ResponseEntity<Map<String, String>> start(@PathVariable String id) {
+    /** Claim a seat for the human. Every other operative is then played by the AI (Ollama). */
+    @PostMapping("/{id}/claim")
+    public ResponseEntity<Map<String, String>> claim(@PathVariable String id, @RequestParam String playerId) {
         GameSession game = games.get(id);
         if (game == null) return ResponseEntity.notFound().build();
-        game.start();
+        games.claimSeat(id, playerId);
+        return ResponseEntity.ok(Map.of("humanSeat", playerId));
+    }
+
+    @PostMapping("/{id}/start")
+    public ResponseEntity<Map<String, String>> start(@PathVariable String id) {
+        GameSession game = games.startGame(id);
+        if (game == null) return ResponseEntity.notFound().build();
         return ResponseEntity.ok(Map.of("phase", game.currentPhase()));
     }
 
     @PostMapping("/{id}/advance")
     public ResponseEntity<Map<String, String>> advance(@PathVariable String id) {
-        GameSession game = games.get(id);
+        GameSession game = games.advanceGame(id);
         if (game == null) return ResponseEntity.notFound().build();
-        game.advance();
         return ResponseEntity.ok(Map.of("phase", game.currentPhase()));
     }
 

@@ -1,6 +1,7 @@
 package com.veil.api.session;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.veil.ai.agent.AiEngine;
 import com.veil.api.DTOs.LeaderboardView;
 import com.veil.confidential.ConfidentialGateway;
 import com.veil.domain.npc.NPC;
@@ -37,31 +38,53 @@ public class GameService {
 
     private final ConfidentialGateway gateway;
     private final LeaderboardListener leaderboard;
+    private final AiEngine ai;
     private final ObjectMapper mapper;
     private final Map<String, GameSession> games = new ConcurrentHashMap<>();
     private final Map<String, Map<String, String>> commitments = new ConcurrentHashMap<>();
 
-    public GameService(ConfidentialGateway gateway, LeaderboardListener leaderboard, ObjectMapper mapper) {
+    public GameService(ConfidentialGateway gateway, LeaderboardListener leaderboard,
+                       AiEngine ai, ObjectMapper mapper) {
         this.gateway = gateway;
         this.leaderboard = leaderboard;
+        this.ai = ai;
         this.mapper = mapper;
     }
 
-    /** Create a ready-to-play demo match (4 players + 1 NPC witness) and return its id. */
+    /**
+     * Create a ready-to-play 8-operative match: 2 Shadows (the mafia) vs the City
+     * (1 Oracle, 1 Aegis, 4 Citizens), across a six-district neon city. Returns its id.
+     */
     public GameSession createDemoGame() {
         String id = "g-" + UUID.randomUUID().toString().substring(0, 8);
 
         City city = new City();
         city.addLocation(new Location("plaza", "Neon Plaza", new Position(0, 0)));
-        city.addLocation(new Location("docks", "Rust Docks", new Position(5, 0)));
-        city.connect("plaza", "docks");
+        city.addLocation(new Location("market", "Data Market", new Position(3, 2)));
+        city.addLocation(new Location("docks", "Rust Docks", new Position(6, 1)));
+        city.addLocation(new Location("tower", "Spire Tower", new Position(6, 5)));
+        city.addLocation(new Location("alley", "Glitch Alley", new Position(1, 4)));
+        city.addLocation(new Location("garden", "Hydro Garden", new Position(3, 6)));
+        city.connect("plaza", "market");
+        city.connect("plaza", "alley");
+        city.connect("market", "docks");
+        city.connect("market", "garden");
+        city.connect("docks", "tower");
+        city.connect("alley", "garden");
+        city.connect("garden", "tower");
 
         GameContext ctx = new GameContext(city, System.nanoTime());
+        // 2 Shadows (mafia) + Oracle + Aegis + 4 Citizens = 8 operatives.
         ctx.addPlayer(new Player("p1", "Vex", new ShadowRole(), "plaza"));
-        ctx.addPlayer(new Player("p2", "Mara", new AegisRole(), "plaza"));
-        ctx.addPlayer(new Player("p3", "Ilya", new OracleRole(), "plaza"));
-        ctx.addPlayer(new Player("p4", "Dax", new CitizenRole(), "plaza"));
+        ctx.addPlayer(new Player("p2", "Nyx", new ShadowRole(), "docks"));
+        ctx.addPlayer(new Player("p3", "Mara", new OracleRole(), "market"));
+        ctx.addPlayer(new Player("p4", "Dax", new AegisRole(), "tower"));
+        ctx.addPlayer(new Player("p5", "Ilya", new CitizenRole(), "plaza"));
+        ctx.addPlayer(new Player("p6", "Juno", new CitizenRole(), "alley"));
+        ctx.addPlayer(new Player("p7", "Rook", new CitizenRole(), "garden"));
+        ctx.addPlayer(new Player("p8", "Echo", new CitizenRole(), "market"));
         ctx.addNpc(new NPC("n1", "Old Kesh", Personality.neutral(), "plaza"));
+        ctx.addNpc(new NPC("n2", "Wire", Personality.neutral(), "docks"));
 
         // Confidential layer owns the roles: publish only commitments (namespaced per game).
         Map<String, String> gameCommitments = new LinkedHashMap<>();
@@ -83,6 +106,30 @@ public class GameService {
 
     public GameSession get(String gameId) {
         return games.get(gameId);
+    }
+
+    /** Claim a seat for a human; every other seat is then played by the AI. */
+    public void claimSeat(String gameId, String playerId) {
+        GameSession session = games.get(gameId);
+        if (session != null) session.claimSeat(playerId);
+    }
+
+    /** Start the match, then let the AI take its turn for the opening (Night) phase. */
+    public GameSession startGame(String gameId) {
+        GameSession session = games.get(gameId);
+        if (session == null) return null;
+        session.start();
+        ai.runPhase(session);
+        return session;
+    }
+
+    /** Advance the phase, then let the AI act for the new phase (chat, votes, night ops). */
+    public GameSession advanceGame(String gameId) {
+        GameSession session = games.get(gameId);
+        if (session == null) return null;
+        session.advance();
+        ai.runPhase(session);
+        return session;
     }
 
     public Map<String, String> commitmentsOf(String gameId) {

@@ -22,6 +22,9 @@ async function get<T>(path: string): Promise<T> {
 /** REST client for match lifecycle. Real-time state arrives over the WebSocket instead. */
 export const gameClient = {
   createGame: () => post<CreateGameResponse>("/games"),
+  /** Claim a seat for the human; all other operatives are then played by the AI. */
+  claim: (id: string, playerId: string) =>
+    post<{ humanSeat: string }>(`/games/${id}/claim?playerId=${playerId}`),
   start: (id: string) => post<{ phase: string }>(`/games/${id}/start`),
   advance: (id: string) => post<{ phase: string }>(`/games/${id}/advance`),
   view: (id: string, playerId: string) =>

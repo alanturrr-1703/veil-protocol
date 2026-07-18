@@ -25,10 +25,15 @@ public final class DtoAssembler {
 
     private DtoAssembler() {}
 
-    public static PlayerView forViewer(GameContext ctx, GamePhase phase, String viewerId) {
+    public static PlayerView forViewer(GameContext ctx, GamePhase phase, String viewerId,
+                                       Set<String> humanIds) {
         Map<String, Boolean> roster = new LinkedHashMap<>();
+        Map<String, String> names = new LinkedHashMap<>();
+        Map<String, String> positions = new LinkedHashMap<>();
         for (Player p : ctx.players().values()) {
             roster.put(p.id(), p.status().isAlive());
+            names.put(p.id(), p.displayName());
+            positions.put(p.id(), p.locationId()); // movement is PUBLIC state
         }
 
         Player viewer = ctx.players().get(viewerId);
@@ -50,11 +55,16 @@ public final class DtoAssembler {
         Set<ChatChannel> postableChannels =
                 ChatPolicy.postableChannels(viewerRole, viewerAlive, phaseType);
 
+        Set<String> humans = humanIds == null ? Set.of() : Set.copyOf(humanIds);
+
         return new PlayerView(
                 viewerId,
                 phase == null ? "NONE" : phase.type().name(),
                 ctx.publicState().announcements(),
                 roster,
+                names,                                          // public display names
+                positions,                                      // public locations
+                humans,                                         // human-controlled seats
                 ownRole,                                        // only the viewer's own role
                 ctx.privateState().investigationResults(viewerId), // only the viewer's results
                 ctx.privateState().npcAnswers(viewerId),           // only the viewer's answers

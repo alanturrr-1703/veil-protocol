@@ -1,19 +1,18 @@
 import { HologramCard } from "../ui/HologramCard";
 import { useGameState } from "../../hooks/useGameState";
-import { DEMO_PLAYERS } from "../../config";
+import { CITY_MAP } from "../../types/Location";
 import type { Intent } from "../../types/Event";
 
 interface Props {
   send: (intent: Intent) => void;
 }
 
-const nameOf = (id: string) => DEMO_PLAYERS.find((p) => p.id === id)?.name ?? id;
-
 /** Night action console — shows only the actions the player's role can perform. */
 export function ActionBar({ send }: Props) {
-  const { role, phase, playerId, alivePlayers } = useGameState();
+  const { role, phase, playerId, alivePlayers, nameOf, view } = useGameState();
   const isNight = phase === "NIGHT";
   const targets = alivePlayers.filter((id) => id !== playerId);
+  const here = playerId ? view?.positions?.[playerId] : undefined;
 
   const roleAction: Record<string, { label: string; make: (id: string) => Intent } | undefined> = {
     SHADOW: { label: "Attack", make: (id) => ({ type: "ATTACK", targetId: id }) },
@@ -50,13 +49,18 @@ export function ActionBar({ send }: Props) {
 
       <div className="mt-4">
         <p className="mb-2 text-xs uppercase tracking-widest text-neon-cyan">Move</p>
-        <div className="flex gap-2">
-          <button className="btn" onClick={() => send({ type: "MOVE", toLocationId: "docks" })}>
-            → Rust Docks
-          </button>
-          <button className="btn" onClick={() => send({ type: "MOVE", toLocationId: "plaza" })}>
-            → Neon Plaza
-          </button>
+        <div className="grid grid-cols-3 gap-2">
+          {CITY_MAP.map((loc) => (
+            <button
+              key={loc.id}
+              disabled={loc.id === here}
+              className={`btn justify-center text-[11px] ${loc.id === here ? "neon-border text-neon-cyan" : ""}`}
+              onClick={() => send({ type: "MOVE", toLocationId: loc.id })}
+            >
+              {loc.id === here ? "◉ " : "→ "}
+              {loc.name}
+            </button>
+          ))}
         </div>
       </div>
     </HologramCard>

@@ -19,6 +19,7 @@ import { NPCDialogue } from "./components/npc/NPCDialogue";
 import { DirectorControls } from "./components/game/DirectorControls";
 import { ChatPanel } from "./components/chat/ChatPanel";
 import { Leaderboard } from "./components/game/Leaderboard";
+import { Roster } from "./components/game/Roster";
 import { HologramCard } from "./components/ui/HologramCard";
 
 function Title() {
@@ -80,24 +81,40 @@ function OperativeSelect() {
   const gameId = useGameStore((s) => s.gameId)!;
   const setSession = useGameStore((s) => s.setSession);
   const { shortHash } = useMidnight();
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const pick = async (id: string) => {
+    setBusy(id);
+    try {
+      await gameClient.claim(gameId, id); // you play this seat; the other 7 become LLM agents
+    } catch {
+      /* claim is best-effort; still enter the seat */
+    }
+    setSession(gameId, id);
+  };
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-8 p-6">
       <Title />
-      <HologramCard title="Select Operative" accent="violet" className="w-full max-w-lg">
+      <HologramCard title="Choose Your Operative" accent="violet" className="w-full max-w-2xl">
         <p className="mb-4 text-xs text-slate-400">
-          Each operative sees a different confidential slice. Their role is hidden behind a
-          commitment (hash) below — never the role itself.
+          You control one operative — the other seven are played by local LLM agents (Ollama).
+          Two of the eight are secretly <span className="text-neon-pink">Shadows</span>. Each role
+          is hidden behind a Midnight commitment (hash), never the role itself.
         </p>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {DEMO_PLAYERS.map((p) => (
             <button
               key={p.id}
-              onClick={() => setSession(gameId, p.id)}
-              className="glass rounded-xl p-4 text-left transition hover:shadow-neon"
+              disabled={busy !== null}
+              onClick={() => pick(p.id)}
+              className="glass rounded-xl p-4 text-left transition hover:shadow-neon disabled:opacity-50"
             >
               <p className="text-lg font-semibold text-white">{p.name}</p>
               <p className="mt-1 truncate text-[10px] text-neon-cyan">◈ {shortHash(p.id)}…</p>
+              <p className="mt-1 text-[9px] uppercase tracking-widest text-slate-500">
+                {busy === p.id ? "linking…" : "play as"}
+              </p>
             </button>
           ))}
         </div>
@@ -128,6 +145,7 @@ function GameScreen() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[320px_1fr_340px]">
         <aside className="space-y-4">
           <PlayerHUD />
+          <Roster />
           <ActionBar send={send} />
           <VotingPanel send={send} />
         </aside>

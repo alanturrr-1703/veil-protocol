@@ -7,6 +7,7 @@ import com.veil.chat.ChatChannel;
 import com.veil.domain.action.GameAction;
 import com.veil.domain.player.Faction;
 import com.veil.domain.player.Player;
+import com.veil.engine.GameContext;
 import com.veil.engine.VeilEngine;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
@@ -30,6 +31,8 @@ public class GameSession {
     private final VeilEngine engine;
     private final ObjectMapper mapper;
     private final Map<String, WebSocketSession> viewers = new ConcurrentHashMap<>();
+    // Seats a human has claimed. Everyone else is played by the AI (Ollama). Public info.
+    private final Set<String> humanIds = ConcurrentHashMap.newKeySet();
 
     public GameSession(String id, VeilEngine engine, ObjectMapper mapper) {
         this.id = id;
@@ -40,6 +43,24 @@ public class GameSession {
     }
 
     public String id() { return id; }
+
+    /** Mark a seat as human-controlled; the AI will skip it. */
+    public synchronized void claimSeat(String playerId) {
+        if (engine.context().players().containsKey(playerId)) {
+            humanIds.add(playerId);
+            broadcast();
+        }
+    }
+
+    public Set<String> humanIds() { return humanIds; }
+    public boolean isHuman(String playerId) { return humanIds.contains(playerId); }
+
+    /**
+     * Server-side read access for the AI engine, which legitimately acts AS the seats it
+     * controls (so it may see their roles). This is NOT the client boundary — clients only
+     * ever get redacted {@link PlayerView}s via {@link #viewFor}.
+     */
+    public GameContext context() { return engine.context(); }
 
     public synchronized void addViewer(String playerId, WebSocketSession session) {
         viewers.put(playerId, session);
@@ -102,7 +123,7 @@ public class GameSession {
     }
 
     public synchronized PlayerView viewFor(String playerId) {
-        return DtoAssembler.forViewer(engine.context(), engine.currentPhase(), playerId);
+        return DtoAssembler.forViewer(engine.context(), engine.currentPhase(), playerId, humanIds);
     }
 
     public synchronized String currentPhase() {

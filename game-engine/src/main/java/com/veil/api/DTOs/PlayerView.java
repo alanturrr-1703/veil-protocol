@@ -18,6 +18,9 @@ import java.util.Set;
  * @param phase               current phase name (public)
  * @param announcements       public announcements (public)
  * @param roster              playerId -> alive? (public)
+ * @param names               playerId -> display name (public)
+ * @param positions           playerId -> locationId (public; movement is public state)
+ * @param humans              playerIds controlled by a human (public; the rest are AI)
  * @param ownRole             THIS viewer's own role (confidential to them)
  * @param ownInvestigations   THIS viewer's investigation results (confidential to them)
  * @param ownNpcAnswers       THIS viewer's NPC answers (confidential to them)
@@ -29,6 +32,9 @@ public record PlayerView(
         String phase,
         List<String> announcements,
         Map<String, Boolean> roster,
+        Map<String, String> names,
+        Map<String, String> positions,
+        Set<String> humans,
         String ownRole,
         Map<String, Faction> ownInvestigations,
         Map<String, List<Observation>> ownNpcAnswers,

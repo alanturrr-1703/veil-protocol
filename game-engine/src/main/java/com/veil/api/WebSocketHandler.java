@@ -28,7 +28,7 @@ public class WebSocketHandler {
         // private events are already scoped by GameEvent#isVisibleTo at the source.
         for (String viewerId : engine.context().players().keySet()) {
             if (event.isVisibleTo(viewerId)) {
-                PlayerView view = DtoAssembler.forViewer(engine.context(), engine.currentPhase(), viewerId);
+                PlayerView view = DtoAssembler.forViewer(engine.context(), engine.currentPhase(), viewerId, java.util.Set.of());
                 sendToClient.accept(viewerId, view);
             }
         }

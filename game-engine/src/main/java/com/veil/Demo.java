@@ -68,7 +68,7 @@ public final class Demo {
         engine.advancePhase();                              // resolve votes -> Night 2
 
         // Redacted view for the Oracle: sees own role + own investigation, not others'.
-        PlayerView oracleView = DtoAssembler.forViewer(ctx, engine.currentPhase(), "p3");
+        PlayerView oracleView = DtoAssembler.forViewer(ctx, engine.currentPhase(), "p3", java.util.Set.of());
         System.out.println("\n=== ORACLE'S REDACTED VIEW ===");
         System.out.println("  role: " + oracleView.ownRole());
         System.out.println("  roster: " + oracleView.roster());

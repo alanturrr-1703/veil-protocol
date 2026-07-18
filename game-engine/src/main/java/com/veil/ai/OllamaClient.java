@@ -29,20 +29,31 @@ public class OllamaClient {
         this.model = model;
     }
 
+    public String model() { return model; }
+
     /** Returns the generated text, or the fallback if the model is unreachable. */
     public String generate(String prompt, String fallback) {
+        return generate(prompt, fallback, 120, 0.8);
+    }
+
+    /**
+     * Generate with a token cap and temperature so AI-player lines stay short and snappy.
+     * Always returns the fallback on any error, so the game never blocks on the model.
+     */
+    public String generate(String prompt, String fallback, int maxTokens, double temperature) {
         try {
             String body = "{\"model\":\"" + model + "\",\"prompt\":\"" + escape(prompt)
-                    + "\",\"stream\":false}";
+                    + "\",\"stream\":false,\"options\":{\"num_predict\":" + maxTokens
+                    + ",\"temperature\":" + temperature + "}}";
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(baseUrl + "/api/generate"))
-                    .timeout(Duration.ofSeconds(20))
+                    .timeout(Duration.ofSeconds(30))
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(body))
                     .build();
             HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
             String text = extractResponseField(response.body());
-            return text == null || text.isBlank() ? fallback : text;
+            return text == null || text.isBlank() ? fallback : text.trim();
         } catch (Exception e) {
             return fallback;
         }

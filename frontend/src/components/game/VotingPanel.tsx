@@ -1,6 +1,5 @@
 import { HologramCard } from "../ui/HologramCard";
 import { useGameState } from "../../hooks/useGameState";
-import { DEMO_PLAYERS } from "../../config";
 import type { Intent } from "../../types/Event";
 
 interface Props {
@@ -9,7 +8,7 @@ interface Props {
 
 /** Voting screen: exile a suspect. Enabled only during the VOTING phase. */
 export function VotingPanel({ send }: Props) {
-  const { phase, playerId, alivePlayers } = useGameState();
+  const { phase, playerId, alivePlayers, nameOf } = useGameState();
   const active = phase === "VOTING";
   const candidates = alivePlayers.filter((id) => id !== playerId);
 
@@ -20,7 +19,7 @@ export function VotingPanel({ send }: Props) {
       )}
       <div className="grid grid-cols-2 gap-2">
         {candidates.map((id) => {
-          const name = DEMO_PLAYERS.find((p) => p.id === id)?.name ?? id;
+          const name = nameOf(id);
           return (
             <button
               key={id}

@@ -1,7 +1,6 @@
 import { HologramCard } from "../ui/HologramCard";
 import { useGameState } from "../../hooks/useGameState";
 import { useGameStore } from "../../stores/gameStore";
-import { DEMO_PLAYERS } from "../../config";
 
 const ROLE_ACCENT: Record<string, string> = {
   SHADOW: "text-neon-pink neon-text-pink",
@@ -13,10 +12,10 @@ const ROLE_ACCENT: Record<string, string> = {
 
 /** Heads-up display: identity, secret role, phase, and connection status. */
 export function PlayerHUD() {
-  const { role, phase, playerId } = useGameState();
+  const { role, phase, playerId, nameOf } = useGameState();
   const connected = useGameStore((s) => s.connected);
   const view = useGameStore((s) => s.view);
-  const name = DEMO_PLAYERS.find((p) => p.id === playerId)?.name ?? playerId ?? "—";
+  const name = playerId ? nameOf(playerId) : "—";
   const alive = playerId ? view?.roster?.[playerId] ?? true : true;
 
   return (

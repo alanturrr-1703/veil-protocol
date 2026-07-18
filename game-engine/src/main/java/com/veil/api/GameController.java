@@ -32,6 +32,6 @@ public class GameController {
 
     /** Returns a redacted, per-viewer snapshot — never raw domain/private state. */
     public PlayerView viewFor(String viewerId) {
-        return DtoAssembler.forViewer(engine.context(), engine.currentPhase(), viewerId);
+        return DtoAssembler.forViewer(engine.context(), engine.currentPhase(), viewerId, java.util.Set.of());
     }
 }

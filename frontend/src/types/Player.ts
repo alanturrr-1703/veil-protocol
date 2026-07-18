@@ -25,6 +25,9 @@ export interface PlayerView {
   phase: GamePhase;
   announcements: string[];
   roster: Record<string, boolean>; // playerId -> alive
+  names: Record<string, string>; // playerId -> display name (public)
+  positions: Record<string, string>; // playerId -> locationId (public)
+  humans: string[]; // human-controlled seats; the rest are AI
   ownRole: string;
   ownInvestigations: Record<string, string>; // targetId -> faction
   ownNpcAnswers: Record<string, Observation[]>; // npcId -> observations

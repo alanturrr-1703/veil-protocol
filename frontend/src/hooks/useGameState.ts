@@ -9,6 +9,8 @@ export function useGameState() {
     ? Object.entries(view.roster).filter(([, alive]) => alive).map(([id]) => id)
     : [];
 
+  const names = view?.names ?? {};
+
   return {
     view,
     playerId,
@@ -16,5 +18,8 @@ export function useGameState() {
     role: view?.ownRole ?? "UNKNOWN",
     alivePlayers,
     announcements: view?.announcements ?? [],
+    names,
+    humans: view?.humans ?? [],
+    nameOf: (id: string) => names[id] ?? id,
   };
 }
