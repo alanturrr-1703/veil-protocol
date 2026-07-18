@@ -8,6 +8,7 @@ import com.veil.domain.player.Player;
 import com.veil.domain.player.Role;
 import com.veil.domain.world.Location;
 import com.veil.engine.GameContext;
+import com.veil.events.AttackFx;
 import com.veil.phases.GamePhase;
 import com.veil.phases.GamePhaseType;
 
@@ -89,6 +90,19 @@ public final class DtoAssembler {
         Set<ChatChannel> postableChannels =
                 ChatPolicy.postableChannels(viewerRole, viewerAlive, phaseType);
 
+        // Live strikes the viewer can witness: only those in the viewer's exact room. Because
+        // you were there, you also see who struck (the attacker is included). Killing with an
+        // audience is how a Shadow gets caught.
+        List<AttackFx> roomAttacks = new ArrayList<>();
+        if (viewer != null && viewer.status().isAlive()) {
+            for (AttackFx fx : ctx.privateState().attackFx()) {
+                if (sameRoom(viewer, fx.district(), fx.room())) roomAttacks.add(fx);
+            }
+        }
+        // Public dawn reveal: who fell last night (everyone sees this, never who struck).
+        List<String> lastNightVictims = new ArrayList<>(ctx.publicState().lastNightVictims());
+        boolean teleportAvailable = viewer != null && viewer.status().isAlive() && viewer.teleportAvailable();
+
         return new PlayerView(
                 viewerId,
                 phase == null ? "NONE" : phase.type().name(),
@@ -108,7 +122,10 @@ public final class DtoAssembler {
                 ctx.privateState().investigationResults(viewerId),
                 ctx.privateState().npcAnswers(viewerId),
                 readableChat,
-                postableChannels
+                postableChannels,
+                roomAttacks,
+                lastNightVictims,
+                teleportAvailable
         );
     }
 

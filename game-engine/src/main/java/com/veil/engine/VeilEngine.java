@@ -62,7 +62,42 @@ public class VeilEngine {
         if (player == null || !player.status().isAlive()) return false;
         if (!player.role().canPerform(action, currentPhase.type())) return false;
 
+        // A Shadow can only strike someone in their OWN room. We check co-location at the
+        // moment the kill is FILED (not at dawn resolution, when everyone has wandered off)
+        // and record a live strike so co-located players witness it — and see who struck.
+        if (action instanceof com.veil.domain.action.AttackAction atk && atk.targetsPlayer(context)) {
+            Player victim = context.players().get(atk.targetId());
+            if (victim == null || !victim.status().isAlive() || !sameRoom(player, victim)) return false;
+            context.privateState().recordAttackFx(new com.veil.events.AttackFx(
+                    player.id(), victim.id(), player.locationId(), player.roomId(),
+                    context.rng().nextInt(3), context.tick()));
+        }
+
         currentPhase.submit(action, context, eventBus);
+        return true;
+    }
+
+    /**
+     * The one teleport each operative gets per night: an instant jump to ANY district (not
+     * just an adjacent one), consuming the allowance. Lands you in the open commons. Allowed
+     * in any phase; the allowance refreshes at nightfall.
+     */
+    public boolean teleport(String playerId, String toLocationId) {
+        Player p = context.players().get(playerId);
+        if (p == null || !p.status().isAlive() || !p.teleportAvailable()) return false;
+        if (toLocationId == null || toLocationId.equals(p.locationId())) return false;
+        com.veil.domain.world.Location to = context.city().location(toLocationId);
+        if (to == null) return false;
+
+        com.veil.domain.world.Location from = context.city().location(p.locationId());
+        String fromId = p.locationId();
+        if (from != null) from.removePlayer(playerId);
+        to.addPlayer(playerId);
+        p.setLocationId(toLocationId);
+        p.setRoomId(Player.COMMONS);
+        p.setPosition(0.5, 0.6);
+        p.setTeleportAvailable(false);
+        eventBus.publish(new com.veil.events.PlayerMovedEvent(context.tick(), playerId, fromId, toLocationId));
         return true;
     }
 

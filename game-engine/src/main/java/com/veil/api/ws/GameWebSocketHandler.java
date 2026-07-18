@@ -70,6 +70,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         switch (intent.type() == null ? "" : intent.type().toUpperCase()) {
             case "MOVE" -> game.move(playerId, intent.toLocationId());
             case "ENTER_ROOM" -> game.enterRoom(playerId, intent.roomId());
+            case "TELEPORT" -> game.teleport(playerId, intent.toLocationId());
             case "ATTACK" -> game.submit(new AttackAction(playerId, intent.targetId()));
             case "SHIELD" -> game.submit(new ShieldAction(playerId, intent.targetId()));
             case "INVESTIGATE" -> game.submit(new InvestigateAction(playerId, intent.targetId()));

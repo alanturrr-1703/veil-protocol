@@ -4,6 +4,7 @@ import com.veil.chat.ChatMessage;
 import com.veil.domain.action.GameAction;
 import com.veil.domain.npc.Observation;
 import com.veil.domain.player.Faction;
+import com.veil.events.AttackFx;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -26,6 +27,8 @@ public class PrivateState {
     private final Map<String, Integer> huntAttemptsRemaining = new HashMap<>();
     private final List<ChatMessage> chatLog = new ArrayList<>();
     private long chatSeq = 0;
+    // Live strikes filed THIS night — witnessed only by players sharing the attack's room.
+    private final List<AttackFx> attackFx = new ArrayList<>();
 
     // --- Night action queue -------------------------------------------------
 
@@ -88,5 +91,20 @@ public class PrivateState {
     /** The full append-only chat log. Only the redaction boundary should read this. */
     public List<ChatMessage> chatLog() {
         return Collections.unmodifiableList(chatLog);
+    }
+
+    // --- Live attack FX (co-located witnesses only) -------------------------
+
+    public void recordAttackFx(AttackFx fx) {
+        attackFx.add(fx);
+    }
+
+    public List<AttackFx> attackFx() {
+        return Collections.unmodifiableList(attackFx);
+    }
+
+    /** Cleared at the start of each night so last night's strikes don't replay. */
+    public void clearAttackFx() {
+        attackFx.clear();
     }
 }

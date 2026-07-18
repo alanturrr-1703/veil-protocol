@@ -47,6 +47,69 @@ interface Person {
   y: number;
 }
 
+/** One of three strike animations, played where the victim stands when a Shadow attacks. */
+function AttackBurst({ x, y, variant }: { x: number; y: number; variant: number }) {
+  const style = { left: `${px(x)}%`, top: `${py(y)}%`, transform: "translate(-50%,-50%)" } as const;
+  if (variant === 0) {
+    // three neon slashes
+    return (
+      <div className="pointer-events-none absolute z-30" style={style}>
+        {[0, 1, 2].map((i) => (
+          <motion.div
+            key={i}
+            className="absolute h-[3px] w-12 rounded-full bg-neon-pink"
+            style={{ boxShadow: "0 0 10px #ff2e97", rotate: -40 + i * 22, x: "-50%", y: "-50%" }}
+            initial={{ scaleX: 0, opacity: 0 }}
+            animate={{ scaleX: [0, 1, 0.2], opacity: [0, 1, 0] }}
+            transition={{ duration: 0.5, delay: i * 0.09 }}
+          />
+        ))}
+      </div>
+    );
+  }
+  if (variant === 1) {
+    // expanding shock rings + impact
+    return (
+      <div className="pointer-events-none absolute z-30" style={style}>
+        {[0, 1].map((i) => (
+          <motion.div
+            key={i}
+            className="absolute h-6 w-6 rounded-full border-2 border-neon-pink"
+            style={{ x: "-50%", y: "-50%", boxShadow: "0 0 12px #ff2e97" }}
+            initial={{ scale: 0, opacity: 0.9 }}
+            animate={{ scale: 4.5, opacity: 0 }}
+            transition={{ duration: 0.9, delay: i * 0.18 }}
+          />
+        ))}
+        <motion.div
+          className="text-xl"
+          style={{ x: "-50%", y: "-50%" }}
+          initial={{ scale: 0 }}
+          animate={{ scale: [0, 1.5, 0] }}
+          transition={{ duration: 0.7 }}
+        >
+          💥
+        </motion.div>
+      </div>
+    );
+  }
+  // variant 2: glitch shrapnel
+  return (
+    <div className="pointer-events-none absolute z-30" style={style}>
+      {Array.from({ length: 9 }).map((_, i) => (
+        <motion.span
+          key={i}
+          className="absolute h-1.5 w-1.5 rounded-full bg-neon-pink"
+          style={{ boxShadow: "0 0 6px #ff2e97" }}
+          initial={{ x: 0, y: 0, opacity: 1 }}
+          animate={{ x: Math.cos((i / 9) * 6.283) * 34, y: Math.sin((i / 9) * 6.283) * 34, opacity: 0 }}
+          transition={{ duration: 0.8, ease: "easeOut" }}
+        />
+      ))}
+    </div>
+  );
+}
+
 function Figure({ color, alive, asleep, index }: { color: string; alive: boolean; asleep: boolean; index: number }) {
   return (
     <motion.div
@@ -270,6 +333,41 @@ export function RoomScene({ send }: { send: (intent: Intent) => void }) {
     }
   };
 
+  // --- live attack animations (only strikes in YOUR room reach you) -------------
+  const [bursts, setBursts] = useState<{ key: string; x: number; y: number; variant: number }[]>([]);
+  const seenFx = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    for (const fx of view?.roomAttacks ?? []) {
+      const key = `${fx.tick}:${fx.victimId}:${fx.variant}`;
+      if (seenFx.current.has(key)) continue;
+      seenFx.current.add(key);
+      const c = view?.coords?.[fx.victimId];
+      const b = { key, x: c ? c[0] : 0.5, y: c ? c[1] : 0.5, variant: fx.variant };
+      setBursts((prev) => [...prev, b]);
+      window.setTimeout(() => setBursts((prev) => prev.filter((z) => z.key !== key)), 1400);
+    }
+  }, [view?.roomAttacks, view?.coords]);
+
+  // --- dawn reveal: who the night claimed --------------------------------------
+  const [dawn, setDawn] = useState<string[] | null>(null);
+  const dawnKey = useRef("");
+  useEffect(() => {
+    const victims = view?.lastNightVictims ?? [];
+    if (phase === "DAY" && victims.length) {
+      const key = victims.join(",");
+      if (dawnKey.current !== key) {
+        dawnKey.current = key;
+        setDawn(victims);
+        window.setTimeout(() => setDawn(null), 6000);
+      }
+    }
+    if (phase === "NIGHT") dawnKey.current = "";
+  }, [phase, view?.lastNightVictims]);
+
+  // --- teleport (one jump to any district per night) ---------------------------
+  const [teleOpen, setTeleOpen] = useState(false);
+  const canTeleport = !!view?.teleportAvailable && iAmAlive;
+
   if (!view || !view.viewerDistrict) return null;
 
   return (
@@ -299,11 +397,46 @@ export function RoomScene({ send }: { send: (intent: Intent) => void }) {
         </p>
       </div>
 
+      {/* teleport — one jump to ANY district per night */}
+      <div className="absolute left-3 top-14 z-20">
+        <button
+          disabled={!canTeleport}
+          onClick={() => setTeleOpen((o) => !o)}
+          className={`rounded-md border px-2 py-1 text-[10px] font-semibold tracking-wide backdrop-blur transition ${
+            canTeleport
+              ? "border-neon-cyan/60 bg-black/60 text-neon-cyan hover:bg-neon-cyan/10"
+              : "border-white/10 bg-black/40 text-slate-500"
+          }`}
+          title={canTeleport ? "Jump to any district (once per night)" : "Recharges at nightfall"}
+        >
+          ⚡ Teleport {canTeleport ? "· 1/night" : "· used"}
+        </button>
+        {teleOpen && canTeleport && (
+          <div className="mt-1 w-44 rounded-md border border-neon-cyan/40 bg-black/90 p-1 backdrop-blur">
+            {CITY_MAP.filter((l) => l.id !== view.viewerDistrict).map((l) => (
+              <button
+                key={l.id}
+                onClick={() => { send({ type: "TELEPORT", toLocationId: l.id }); setTeleOpen(false); }}
+                className="flex w-full items-center justify-between rounded px-2 py-1 text-[10px] hover:bg-white/10"
+              >
+                <span className="text-slate-200">{l.name}</span>
+                <span className="text-slate-500">{view.districtCounts?.[l.id] ?? 0} here</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
       {people.length <= 1 && (
         <div className="absolute inset-0 flex items-center justify-center">
           <p className="text-xs italic text-slate-500">The room is empty. Roam with WASD or slip through a door.</p>
         </div>
       )}
+
+      {/* live strike animations */}
+      {bursts.map((b) => (
+        <AttackBurst key={b.key} x={b.x} y={b.y} variant={b.variant} />
+      ))}
 
       {/* characters */}
       {people.map((p, i) => {
@@ -454,8 +587,39 @@ export function RoomScene({ send }: { send: (intent: Intent) => void }) {
         )}
       </AnimatePresence>
 
+      {/* dawn reveal — who fell in the night (everyone sees this) */}
+      <AnimatePresence>
+        {dawn && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-black/75 backdrop-blur-sm"
+          >
+            <motion.p initial={{ y: -12, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
+              className="text-[10px] uppercase tracking-[0.5em] text-neon-amber">
+              Dawn breaks
+            </motion.p>
+            <p className="mt-1 text-xs text-slate-400">The night claimed…</p>
+            <div className="mt-3 flex flex-col items-center gap-2">
+              {dawn.map((id, i) => (
+                <motion.div key={id} initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+                  transition={{ delay: 0.2 + i * 0.25 }} className="flex items-center gap-2">
+                  <span className="text-lg">🩸</span>
+                  <span className="neon-text text-xl font-bold text-neon-pink line-through decoration-neon-pink/70">
+                    {view.names[id] ?? id}
+                  </span>
+                </motion.div>
+              ))}
+            </div>
+            <button onClick={() => setDawn(null)}
+              className="mt-5 text-[10px] uppercase tracking-widest text-slate-400 hover:text-white">
+              dismiss
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <p className="absolute bottom-1 right-2 text-[9px] text-slate-500">
-        {iAmAlive ? "WASD move · E whisper · click to act" : "you are eliminated"}
+        {iAmAlive ? "WASD move · E whisper · ⚡ teleport · click to act" : "you are eliminated"}
       </p>
     </div>
   );

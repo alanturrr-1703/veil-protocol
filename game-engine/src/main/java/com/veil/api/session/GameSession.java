@@ -136,6 +136,13 @@ public class GameSession {
         return ok;
     }
 
+    /** The one-per-night teleport: jump to any district (any phase). */
+    public synchronized boolean teleport(String playerId, String toLocationId) {
+        boolean ok = engine.teleport(playerId, toLocationId);
+        if (ok) broadcast();
+        return ok;
+    }
+
     /** Update a player's free-roam position within their room and re-push co-located views. */
     public synchronized void updatePosition(String playerId, double x, double y) {
         Player p = engine.context().players().get(playerId);

@@ -57,6 +57,9 @@ public class GameService {
     private final Map<String, ScheduledFuture<?>> timers = new ConcurrentHashMap<>();
     // Per-game loop that makes AI-controlled operatives wander the map (even in the lobby).
     private final Map<String, ScheduledFuture<?>> wanderers = new ConcurrentHashMap<>();
+    // Each AI's current stroll target within its room ("gameId:playerId" -> {tx,ty}), so it
+    // ambles smoothly toward a point instead of teleporting around randomly.
+    private final Map<String, double[]> wanderTargets = new ConcurrentHashMap<>();
     private final java.util.Random rng = new java.util.Random();
 
     public GameService(ConfidentialGateway gateway, LeaderboardListener leaderboard,
@@ -220,31 +223,56 @@ public class GameService {
      * seats are skipped; they move themselves.
      */
     private void startWander(String gameId, GameSession session) {
+        // A brisk, steady tick with SMALL steps reads as natural strolling; the frontend
+        // interpolates between updates so motion stays smooth.
         ScheduledFuture<?> f = scheduler.scheduleAtFixedRate(
-                () -> wander(session), 1200, 1800, TimeUnit.MILLISECONDS);
+                () -> wander(gameId, session), 900, 650, TimeUnit.MILLISECONDS);
         wanderers.put(gameId, f);
     }
 
-    private void wander(GameSession session) {
+    // Small per-tick step toward the target (as a fraction of the remaining distance).
+    private static final double STEP = 0.22;
+
+    private void wander(String gameId, GameSession session) {
         try {
             GameContext ctx = session.context();
             for (Player p : ctx.players().values()) {
                 if (!p.status().isAlive() || session.isHuman(p.id())) continue;
                 double roll = rng.nextDouble();
-                if (roll < 0.14) {
+
+                // Rarely change district (to an ADJACENT one) — no more erratic map-hopping.
+                if (roll < 0.03) {
                     var neighbors = new java.util.ArrayList<>(ctx.city().neighbors(p.locationId()));
-                    if (!neighbors.isEmpty()) session.move(p.id(), neighbors.get(rng.nextInt(neighbors.size())));
-                } else if (roll < 0.30) {
+                    if (!neighbors.isEmpty()) {
+                        session.move(p.id(), neighbors.get(rng.nextInt(neighbors.size())));
+                        wanderTargets.remove(gameId + ":" + p.id());
+                    }
+                    continue;
+                }
+                // Occasionally slip into another room in the same district.
+                if (roll < 0.055) {
                     Location loc = ctx.city().location(p.locationId());
                     if (loc != null) {
                         var rooms = new java.util.ArrayList<>(loc.rooms().keySet());
                         session.enterRoom(p.id(), rooms.get(rng.nextInt(rooms.size())));
+                        wanderTargets.remove(gameId + ":" + p.id());
                     }
-                } else {
-                    double nx = p.x() + (rng.nextDouble() - 0.5) * 0.4;
-                    double ny = p.y() + (rng.nextDouble() - 0.5) * 0.4;
-                    session.updatePosition(p.id(), nx, ny);
+                    continue;
                 }
+
+                // Otherwise: amble toward a target point, picking a new one on arrival or,
+                // now and then, to keep the pathing from looking robotic.
+                String key = gameId + ":" + p.id();
+                double[] tgt = wanderTargets.get(key);
+                double dx = tgt == null ? 1 : tgt[0] - p.x();
+                double dy = tgt == null ? 1 : tgt[1] - p.y();
+                if (tgt == null || Math.hypot(dx, dy) < 0.06 || rng.nextDouble() < 0.08) {
+                    tgt = new double[]{0.15 + rng.nextDouble() * 0.7, 0.2 + rng.nextDouble() * 0.65};
+                    wanderTargets.put(key, tgt);
+                    dx = tgt[0] - p.x();
+                    dy = tgt[1] - p.y();
+                }
+                session.updatePosition(p.id(), p.x() + dx * STEP, p.y() + dy * STEP);
             }
         } catch (Exception ignored) {
             // never let a wander hiccup kill the scheduler

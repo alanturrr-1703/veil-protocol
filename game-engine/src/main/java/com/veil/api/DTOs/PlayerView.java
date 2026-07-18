@@ -4,6 +4,7 @@ import com.veil.chat.ChatChannel;
 import com.veil.chat.ChatMessage;
 import com.veil.domain.npc.Observation;
 import com.veil.domain.player.Faction;
+import com.veil.events.AttackFx;
 
 import java.util.List;
 import java.util.Map;
@@ -39,6 +40,9 @@ import java.util.Set;
  * @param ownNpcAnswers     THIS viewer's NPC answers
  * @param readableChat      chat lines THIS viewer may see (filtered by ChatPolicy)
  * @param postableChannels  channels THIS viewer may post to right now
+ * @param roomAttacks       strikes happening in THIS viewer's room (witnessed live, attacker shown)
+ * @param lastNightVictims  who fell last night — the public dawn reveal
+ * @param teleportAvailable whether THIS viewer still has their one nightly teleport
  */
 public record PlayerView(
         String viewerId,
@@ -59,5 +63,8 @@ public record PlayerView(
         Map<String, Faction> ownInvestigations,
         Map<String, List<Observation>> ownNpcAnswers,
         List<ChatMessage> readableChat,
-        Set<ChatChannel> postableChannels
+        Set<ChatChannel> postableChannels,
+        List<AttackFx> roomAttacks,
+        List<String> lastNightVictims,
+        boolean teleportAvailable
 ) {}

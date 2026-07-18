@@ -83,11 +83,19 @@ public class AiEngine {
             else cityTargets.add(p);
         }
 
-        // Shadows (mafia) coordinate a single kill. If at least one shadow is AI, it files
-        // the hit; if the human is the only shadow, they choose their own target in the UI.
+        // Shadows (mafia) coordinate a single kill. A Shadow can only strike in their OWN
+        // room, so the AI first closes the distance — using its nightly teleport to reach the
+        // victim's district if needed — then slips into their room and strikes. Killing where
+        // bystanders stand will expose it, so it prefers a victim who is alone.
         Player aiShadow = firstAi(session, shadows);
         if (aiShadow != null && !cityTargets.isEmpty()) {
-            Player victim = cityTargets.get(ctx.rng().nextInt(cityTargets.size()));
+            Player victim = pickVictim(ctx, cityTargets);
+            if (!sameRoom(aiShadow, victim)) {
+                if (!aiShadow.locationId().equals(victim.locationId())) {
+                    session.teleport(aiShadow.id(), victim.locationId());
+                }
+                session.enterRoom(aiShadow.id(), victim.roomId());
+            }
             session.submit(new AttackAction(aiShadow.id(), victim.id()));
         }
 
@@ -105,6 +113,30 @@ public class AiEngine {
                 }
             }
         }
+    }
+
+    /** Prefer a victim who is alone in their room (quiet kill); otherwise anyone. */
+    private Player pickVictim(GameContext ctx, List<Player> cityTargets) {
+        List<Player> alone = new ArrayList<>();
+        for (Player t : cityTargets) {
+            boolean hasCompany = false;
+            for (Player other : allAlive(ctx)) {
+                if (!other.id().equals(t.id()) && sameRoom(other, t)
+                        && other.role().role().faction() != Faction.SHADOW) {
+                    hasCompany = true;
+                    break;
+                }
+            }
+            if (!hasCompany) alone.add(t);
+        }
+        List<Player> pool = alone.isEmpty() ? cityTargets : alone;
+        return pool.get(ctx.rng().nextInt(pool.size()));
+    }
+
+    private boolean sameRoom(Player a, Player b) {
+        return a.locationId() != null
+                && a.locationId().equals(b.locationId())
+                && a.roomId().equals(b.roomId());
     }
 
     private Player pickInvestigation(GameSession session, GameContext ctx, Player oracle) {

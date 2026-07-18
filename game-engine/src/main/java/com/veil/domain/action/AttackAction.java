@@ -36,6 +36,13 @@ public class AttackAction implements GameAction {
     @Override public GamePhaseType requiredPhase() { return GamePhaseType.NIGHT; }
     @Override public int priority() { return PRIORITY; }
 
+    public String targetId() { return targetId; }
+
+    /** True when this strike targets another player (vs. an NPC witness). */
+    public boolean targetsPlayer(GameContext ctx) {
+        return ctx.players().containsKey(targetId);
+    }
+
     @Override
     public boolean validate(GameContext ctx) {
         Player attacker = ctx.players().get(actorId);
@@ -57,6 +64,8 @@ public class AttackAction implements GameAction {
                 Location loc = ctx.city().location(targetPlayer.locationId());
                 if (loc != null) loc.removePlayer(targetPlayer.id());
                 witnessAttack(ctx, targetPlayer.locationId(), targetPlayer.id());
+                // Public dawn reveal: the city learns WHO fell (never who struck).
+                ctx.publicState().recordNightVictim(targetPlayer.id());
             }
             bus.publish(new AttackEvent(ctx.tick(), actorId, targetId, blocked));
             return;

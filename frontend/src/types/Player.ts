@@ -41,6 +41,19 @@ export interface PlayerView {
   ownNpcAnswers: Record<string, Observation[]>; // npcId -> observations
   readableChat: ChatMessage[]; // already filtered by ChatPolicy
   postableChannels: ChatChannel[]; // channels this viewer may post to now
+  roomAttacks: AttackFx[]; // strikes in YOUR room, witnessed live (attacker shown)
+  lastNightVictims: string[]; // who fell last night — the public dawn reveal
+  teleportAvailable: boolean; // whether you still have your one nightly teleport
+}
+
+/** A visible strike — mirrors the Java `AttackFx` record. Only sent to co-located witnesses. */
+export interface AttackFx {
+  attackerId: string;
+  victimId: string;
+  district: string;
+  room: string;
+  variant: number; // which of the attack animations to play (0..2)
+  tick: number;
 }
 
 /** One ranked row of the public leaderboard — mirrors Java `LeaderboardView.Row`. */
