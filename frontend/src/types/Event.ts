@@ -14,6 +14,8 @@ import type { ChatChannel } from "./Player";
 export type Intent =
   | { type: "MOVE"; toLocationId: string }
   | { type: "ENTER_ROOM"; roomId: string }
+  | { type: "POS"; x: number; y: number }
+  | { type: "WHISPER"; targetId: string; text: string }
   | { type: "ATTACK"; targetId: string }
   | { type: "SHIELD"; targetId: string }
   | { type: "INVESTIGATE"; targetId: string }

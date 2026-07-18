@@ -16,6 +16,7 @@ const CHANNEL_STYLE: Record<ChatChannel, string> = {
   SHADOW: "text-neon-pink",
   DEAD: "text-neon-violet",
   SYSTEM: "text-neon-amber",
+  DIRECT: "text-neon-lime",
 };
 
 const CHANNEL_LABEL: Record<ChatChannel, string> = {
@@ -23,6 +24,7 @@ const CHANNEL_LABEL: Record<ChatChannel, string> = {
   SHADOW: "Shadows",
   DEAD: "The Fallen",
   SYSTEM: "Narrator",
+  DIRECT: "Whisper",
 };
 
 export function ChatPanel({ send }: { send: (intent: Intent) => void }) {
@@ -32,7 +34,8 @@ export function ChatPanel({ send }: { send: (intent: Intent) => void }) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const postable = useMemo(() => view?.postableChannels ?? [], [view]);
-  const messages = view?.readableChat ?? [];
+  // Whispers (DIRECT) live in the proximity chat on the room stage, not the public feed.
+  const messages = (view?.readableChat ?? []).filter((m) => m.channel !== "DIRECT");
 
   // Keep a valid selected channel as phase/role changes flip what's postable.
   useEffect(() => {

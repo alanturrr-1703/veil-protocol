@@ -75,6 +75,12 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             case "QUERY_NPC" -> game.submit(new QueryNPCAction(playerId, intent.npcId(), intent.topic(), phase));
             case "VOTE" -> game.vote(playerId, intent.targetId());
             case "CHAT" -> game.postChat(playerId, parseChannel(intent.channel()), intent.text());
+            case "WHISPER" -> game.postWhisper(playerId, intent.targetId(), intent.text());
+            case "POS" -> {
+                if (intent.x() != null && intent.y() != null) {
+                    game.updatePosition(playerId, intent.x(), intent.y());
+                }
+            }
             default -> { /* unknown intent ignored */ }
         }
     }

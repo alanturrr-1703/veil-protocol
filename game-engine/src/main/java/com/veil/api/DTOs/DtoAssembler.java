@@ -55,11 +55,15 @@ public final class DtoAssembler {
 
         // VISIBLE players: those sharing the viewer's exact (district, room). Includes self.
         Map<String, String> positions = new LinkedHashMap<>();
+        Map<String, double[]> coords = new LinkedHashMap<>();
         Map<String, String> npcsHere = new LinkedHashMap<>();
         if (viewer != null && viewer.status().isAlive()) {
             for (Player p : ctx.players().values()) {
                 if (!p.status().isAlive()) continue;
-                if (sameRoom(viewer, p)) positions.put(p.id(), p.locationId());
+                if (sameRoom(viewer, p)) {
+                    positions.put(p.id(), p.locationId());
+                    coords.put(p.id(), new double[]{p.x(), p.y()});
+                }
             }
             for (NPC n : ctx.npcs().values()) {
                 if (n.isAlive() && sameRoom(viewer, n.locationId(), n.roomId())) {
@@ -76,7 +80,11 @@ public final class DtoAssembler {
 
         List<ChatMessage> readableChat = new ArrayList<>();
         for (ChatMessage m : ctx.privateState().chatLog()) {
-            if (ChatPolicy.canRead(viewerRole, viewerAlive, m.channel())) readableChat.add(m);
+            boolean visible = m.channel() == ChatChannel.DIRECT
+                    // a whisper reaches only its two ends
+                    ? (viewerId.equals(m.senderId()) || viewerId.equals(m.toId()))
+                    : ChatPolicy.canRead(viewerRole, viewerAlive, m.channel());
+            if (visible) readableChat.add(m);
         }
         Set<ChatChannel> postableChannels =
                 ChatPolicy.postableChannels(viewerRole, viewerAlive, phaseType);
@@ -94,6 +102,7 @@ public final class DtoAssembler {
                 viewerRoom,
                 rooms,
                 positions,                                          // only co-located players
+                coords,                                             // their live x,y in the room
                 npcsHere,                                           // only co-located NPCs
                 ownRole,
                 ctx.privateState().investigationResults(viewerId),

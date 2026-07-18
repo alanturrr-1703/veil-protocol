@@ -18,6 +18,7 @@ import com.veil.phases.GamePhaseType;
  * @param tick           logical tick at post time (deterministic, not wall-clock)
  * @param seq            monotonic sequence for stable intra-tick ordering
  * @param text           the message body
+ * @param toId           recipient player id for a DIRECT whisper; {@code null} otherwise
  */
 public record ChatMessage(
         String senderId,
@@ -26,7 +27,8 @@ public record ChatMessage(
         GamePhaseType phaseWhenSent,
         long tick,
         long seq,
-        String text
+        String text,
+        String toId
 ) {
     /** Sender id used for narrator / announcement lines. */
     public static final String SYSTEM_SENDER = "SYSTEM";

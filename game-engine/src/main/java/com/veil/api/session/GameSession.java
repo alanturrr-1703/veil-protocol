@@ -105,6 +105,21 @@ public class GameSession {
         return ok;
     }
 
+    /** Private whisper to a co-located player; visible only to the two of them. */
+    public synchronized boolean postWhisper(String senderId, String toId, String text) {
+        boolean ok = engine.postWhisper(senderId, toId, text);
+        if (ok) broadcast();
+        return ok;
+    }
+
+    /** Update a player's free-roam position within their room and re-push co-located views. */
+    public synchronized void updatePosition(String playerId, double x, double y) {
+        Player p = engine.context().players().get(playerId);
+        if (p == null || !p.status().isAlive()) return;
+        p.setPosition(x, y);
+        broadcast();
+    }
+
     /** Public alive-set (roster is public state), used as input to the confidential winner check. */
     public synchronized Set<String> alivePlayerIds() {
         Set<String> alive = new LinkedHashSet<>();

@@ -108,6 +108,13 @@ public class GameService {
         wire.setRoomId("warehouse"); // an NPC hiding off the commons — only found by entering
         ctx.addNpc(wire);
 
+        // Spread starting positions so co-located operatives don't stack on one spot.
+        int idx = 0;
+        for (Player p : ctx.players().values()) {
+            p.setPosition(0.2 + (idx % 4) * 0.2, 0.35 + (idx / 4) * 0.3);
+            idx++;
+        }
+
         // Confidential layer owns the roles: publish only commitments (namespaced per game).
         Map<String, String> gameCommitments = new LinkedHashMap<>();
         for (Player p : ctx.players().values()) {

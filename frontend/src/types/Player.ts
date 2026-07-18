@@ -1,7 +1,7 @@
 import type { Observation } from "./Event";
 
-/** The four chat channels — mirrors the Java `ChatChannel` enum. */
-export type ChatChannel = "DAY" | "SHADOW" | "DEAD" | "SYSTEM";
+/** The chat channels — mirrors the Java `ChatChannel` enum. */
+export type ChatChannel = "DAY" | "SHADOW" | "DEAD" | "SYSTEM" | "DIRECT";
 
 /** One chat line — mirrors the Java `ChatMessage` record (already redacted per viewer). */
 export interface ChatMessage {
@@ -12,6 +12,7 @@ export interface ChatMessage {
   tick: number;
   seq: number;
   text: string;
+  toId?: string | null; // recipient for a DIRECT whisper
 }
 
 /**
@@ -33,6 +34,7 @@ export interface PlayerView {
   viewerRoom: string | null; // which room the viewer is in
   rooms: Record<string, string>; // rooms of the viewer's district: roomId -> name
   positions: Record<string, string>; // VISIBLE players (share your room): playerId -> districtId
+  coords: Record<string, number[]>; // VISIBLE players' room positions: playerId -> [x,y]
   npcsHere: Record<string, string>; // NPCs sharing your room: npcId -> name
   ownRole: string;
   ownInvestigations: Record<string, string>; // targetId -> faction

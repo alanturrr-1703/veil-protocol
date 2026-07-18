@@ -32,6 +32,7 @@ import java.util.Set;
  * @param viewerRoom        the room THIS viewer is in
  * @param rooms             rooms of the viewer's current district: roomId -> name
  * @param positions         VISIBLE players (share the viewer's room): playerId -> districtId
+ * @param coords            VISIBLE players' free-roam positions in the room: playerId -> [x,y]
  * @param npcsHere          NPCs sharing the viewer's room: npcId -> name
  * @param ownRole           THIS viewer's own role (confidential to them)
  * @param ownInvestigations THIS viewer's investigation results
@@ -52,6 +53,7 @@ public record PlayerView(
         String viewerRoom,
         Map<String, String> rooms,
         Map<String, String> positions,
+        Map<String, double[]> coords,
         Map<String, String> npcsHere,
         String ownRole,
         Map<String, Faction> ownInvestigations,

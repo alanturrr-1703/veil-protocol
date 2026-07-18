@@ -109,9 +109,43 @@ public class VeilEngine {
                 currentPhaseType(),
                 context.tick(),
                 context.privateState().nextChatSeq(),
-                text
+                text,
+                null
         ));
         return true;
+    }
+
+    /**
+     * Post a private whisper from one player to another. Allowed ONLY when both are alive
+     * and standing in the SAME room (proximity) — you can only speak privately to someone
+     * right next to you. Stored on the confidential DIRECT channel; the redaction boundary
+     * reveals it exclusively to the sender and recipient.
+     */
+    public boolean postWhisper(String senderId, String toId, String text) {
+        if (toId == null || text == null || text.isBlank()) return false;
+        Player sender = context.players().get(senderId);
+        Player target = context.players().get(toId);
+        if (sender == null || target == null) return false;
+        if (!sender.status().isAlive() || !target.status().isAlive()) return false;
+        if (!sameRoom(sender, target)) return false;
+
+        context.privateState().postChatMessage(new ChatMessage(
+                senderId,
+                sender.displayName(),
+                ChatChannel.DIRECT,
+                currentPhaseType(),
+                context.tick(),
+                context.privateState().nextChatSeq(),
+                text,
+                toId
+        ));
+        return true;
+    }
+
+    private boolean sameRoom(Player a, Player b) {
+        return a.locationId() != null
+                && a.locationId().equals(b.locationId())
+                && a.roomId().equals(b.roomId());
     }
 
     /**
@@ -126,7 +160,8 @@ public class VeilEngine {
                 currentPhaseType(),
                 context.tick(),
                 context.privateState().nextChatSeq(),
-                text
+                text,
+                null
         ));
     }
 

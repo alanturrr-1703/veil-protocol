@@ -37,7 +37,9 @@ public final class ChatPolicy {
             case DAY -> alive && (phase == GamePhaseType.DAY || phase == GamePhaseType.VOTING);
             case SHADOW -> alive && isShadow(role) && phase == GamePhaseType.NIGHT;
             case DEAD -> !alive;
-            case SYSTEM -> false;
+            // SYSTEM is engine-only; DIRECT whispers are validated per-recipient in the engine,
+            // not through the generic channel gate, so both are false here.
+            case SYSTEM, DIRECT -> false;
         };
     }
 
@@ -56,6 +58,8 @@ public final class ChatPolicy {
             case SYSTEM, DAY -> true;
             case SHADOW -> alive && isShadow(role);
             case DEAD -> !alive;
+            // DIRECT is decided by recipient identity (sender/toId), handled in DtoAssembler.
+            case DIRECT -> false;
         };
     }
 

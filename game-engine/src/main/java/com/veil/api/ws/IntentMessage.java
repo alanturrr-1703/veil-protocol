@@ -19,5 +19,7 @@ public record IntentMessage(
         String npcId,
         String topic,
         String channel,
-        String text
+        String text,
+        Double x,
+        Double y
 ) {}

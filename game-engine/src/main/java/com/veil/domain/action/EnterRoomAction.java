@@ -43,5 +43,6 @@ public class EnterRoomAction implements GameAction {
     public void execute(GameContext ctx, EventBus bus) {
         Player actor = ctx.players().get(actorId);
         actor.setRoomId(roomId);
+        actor.setPosition(0.5, 0.8); // step in through the doorway
     }
 }
