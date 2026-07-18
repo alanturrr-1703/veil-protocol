@@ -5,12 +5,13 @@ import { useGameStore } from "../../stores/gameStore";
 
 /**
  * A top-down 2D neon city rendered with PixiJS — Stardew Valley by way of Blade Runner.
- * Tiled asphalt, glowing districts with lit windows, rain, and phase-driven ambient light.
  *
- * Crucially it respects location privacy: each district shows only an ANONYMOUS living
- * head-count (public), while actual operative/NPC tokens are drawn ONLY for those who share
- * your exact room (from the redacted `positions` / `npcsHere`). Slip into a side room and
- * you disappear from everyone in the commons.
+ * It respects location privacy: each district shows only an ANONYMOUS living head-count
+ * (public), while operative tokens are drawn ONLY for those who share your exact room.
+ *
+ * `compact` mode is the minimap dressing: small district nodes with a count, thin roads, a
+ * highlight on your current district, and tiny dots — no windows/labels/rain, so it stays
+ * legible at ~230px wide.
  */
 
 const DISTRICT_COLOR: Record<string, number> = {
@@ -33,7 +34,7 @@ interface Token {
   seed: number;
 }
 
-export function NeonMap() {
+export function NeonMap({ compact = false }: { compact?: boolean } = {}) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const view = useGameStore((s) => s.view);
   const playerId = useGameStore((s) => s.playerId);
@@ -46,7 +47,6 @@ export function NeonMap() {
     humans: [] as string[],
     roster: {} as Record<string, boolean>,
     viewerDistrict: null as string | null,
-    viewerRoom: null as string | null,
     phase: "LOBBY" as string,
     me: null as string | null,
   });
@@ -58,7 +58,6 @@ export function NeonMap() {
     humans: view?.humans ?? [],
     roster: view?.roster ?? {},
     viewerDistrict: view?.viewerDistrict ?? null,
-    viewerRoom: view?.viewerRoom ?? null,
     phase: view?.phase ?? "LOBBY",
     me: playerId,
   };
@@ -69,6 +68,7 @@ export function NeonMap() {
 
     const districtPos: Record<string, { x: number; y: number }> = {};
     const badges: Record<string, Text> = {};
+    const rings: Record<string, Graphics> = {};
     const tokens = new Map<string, Token>();
     let W = 0;
     let H = 0;
@@ -90,43 +90,42 @@ export function NeonMap() {
       W = app.screen.width;
       H = app.screen.height;
 
+      const bw = compact ? 30 : 92;
+      const bh = compact ? 20 : 62;
+      const radius = compact ? 4 : 8;
+
       groundLayer.removeChildren();
       groundLayer.addChild(new Graphics().rect(0, 0, W, H).fill({ color: 0x070912 }));
       const grid = new Graphics();
-      const step = 44;
+      const step = compact ? 22 : 44;
       for (let x = 0; x <= W; x += step) grid.moveTo(x, 0).lineTo(x, H);
       for (let y = 0; y <= H; y += step) grid.moveTo(0, y).lineTo(W, y);
-      grid.stroke({ width: 1, color: 0x1b2540, alpha: 0.6 });
+      grid.stroke({ width: 1, color: 0x1b2540, alpha: compact ? 0.35 : 0.6 });
       groundLayer.addChild(grid);
 
-      for (const loc of CITY_MAP) districtPos[loc.id] = { x: loc.x * W, y: loc.y * H };
+      // keep nodes off the edges so labels/counts aren't clipped
+      const pad = compact ? 0.14 : 0.06;
+      const mapX = (x: number) => (pad + x * (1 - 2 * pad)) * W;
+      const mapY = (y: number) => (pad + y * (1 - 2 * pad)) * H;
+      for (const loc of CITY_MAP) districtPos[loc.id] = { x: mapX(loc.x), y: mapY(loc.y) };
 
       roadLayer.removeChildren();
       const glowRoads = new Graphics();
       const roads = new Graphics();
-      const dashes = new Graphics();
       for (const [a, b] of CITY_EDGES) {
         const pa = districtPos[a];
         const pb = districtPos[b];
         if (!pa || !pb) continue;
         glowRoads.moveTo(pa.x, pa.y).lineTo(pb.x, pb.y);
         roads.moveTo(pa.x, pa.y).lineTo(pb.x, pb.y);
-        const dx = pb.x - pa.x;
-        const dy = pb.y - pa.y;
-        const n = Math.floor(Math.hypot(dx, dy) / 22);
-        for (let i = 0; i < n; i += 2) {
-          dashes
-            .moveTo(pa.x + (dx * i) / n, pa.y + (dy * i) / n)
-            .lineTo(pa.x + (dx * (i + 1)) / n, pa.y + (dy * (i + 1)) / n);
-        }
       }
-      glowRoads.stroke({ width: 16, color: 0x14314a, alpha: 0.5 });
-      roads.stroke({ width: 4, color: 0x0e1a2e });
-      dashes.stroke({ width: 1.5, color: 0x2dd4bf, alpha: 0.35 });
-      roadLayer.addChild(glowRoads, roads, dashes);
+      glowRoads.stroke({ width: compact ? 6 : 16, color: 0x14314a, alpha: 0.5 });
+      roads.stroke({ width: compact ? 2 : 4, color: 0x0e1a2e });
+      roadLayer.addChild(glowRoads, roads);
 
       buildingLayer.removeChildren();
       for (const key of Object.keys(badges)) delete badges[key];
+      for (const key of Object.keys(rings)) delete rings[key];
       for (const loc of CITY_MAP) {
         const c = DISTRICT_COLOR[loc.id] ?? 0x22d3ee;
         const p = districtPos[loc.id];
@@ -134,45 +133,63 @@ export function NeonMap() {
         node.x = p.x;
         node.y = p.y;
         (node as unknown as { _accent: number })._accent = c;
-        const bw = 92;
-        const bh = 62;
+
         const glow = new Graphics()
-          .roundRect(-bw / 2 - 8, -bh / 2 - 8, bw + 16, bh + 16, 12)
+          .roundRect(-bw / 2 - 8, -bh / 2 - 8, bw + 16, bh + 16, radius + 4)
           .fill({ color: c, alpha: 0.08 });
+        // "you are here" ring (toggled in sync)
+        const ring = new Graphics()
+          .roundRect(-bw / 2 - 4, -bh / 2 - 4, bw + 8, bh + 8, radius + 3)
+          .stroke({ width: 2, color: 0xffffff, alpha: 0.9 });
+        ring.alpha = 0;
+        rings[loc.id] = ring;
         const base = new Graphics()
-          .roundRect(-bw / 2, -bh / 2, bw, bh, 8)
+          .roundRect(-bw / 2, -bh / 2, bw, bh, radius)
           .fill({ color: 0x0c1424 })
-          .stroke({ width: 2, color: c, alpha: 0.9 });
-        const windows = new Graphics();
-        for (let r = 0; r < 3; r++) {
-          for (let col = 0; col < 5; col++) {
-            const on = rand(loc.x * 100 + r * 7 + col * 13) > 0.45;
-            const wx = -bw / 2 + 12 + col * ((bw - 24) / 4);
-            const wy = -bh / 2 + 14 + r * ((bh - 28) / 2);
-            windows.rect(wx - 4, wy - 4, 8, 8).fill({ color: on ? c : 0x1a2338, alpha: on ? 0.9 : 0.5 });
+          .stroke({ width: compact ? 1.5 : 2, color: c, alpha: 0.9 });
+        node.addChild(glow, ring, base);
+
+        if (!compact) {
+          const windows = new Graphics();
+          for (let r = 0; r < 3; r++) {
+            for (let col = 0; col < 5; col++) {
+              const on = rand(loc.x * 100 + r * 7 + col * 13) > 0.45;
+              const wx = -bw / 2 + 12 + col * ((bw - 24) / 4);
+              const wy = -bh / 2 + 14 + r * ((bh - 28) / 2);
+              windows.rect(wx - 4, wy - 4, 8, 8).fill({ color: on ? c : 0x1a2338, alpha: on ? 0.9 : 0.5 });
+            }
           }
+          const label = new Text({
+            text: loc.name.toUpperCase(),
+            style: { fill: c, fontSize: 11, fontFamily: "monospace", letterSpacing: 2, fontWeight: "700" },
+          });
+          label.anchor.set(0.5, 1);
+          label.y = -bh / 2 - 12;
+          node.addChild(windows, label);
         }
-        const label = new Text({
-          text: loc.name.toUpperCase(),
-          style: { fill: c, fontSize: 11, fontFamily: "monospace", letterSpacing: 2, fontWeight: "700" },
-        });
-        label.anchor.set(0.5, 1);
-        label.y = -bh / 2 - 12;
-        // anonymous public head-count badge
+
+        // head-count badge — centered inside the node when compact, below it otherwise
         const badge = new Text({
           text: "",
-          style: { fill: 0xe2e8f0, fontSize: 11, fontFamily: "monospace", letterSpacing: 1 },
+          style: {
+            fill: 0xe2e8f0,
+            fontSize: compact ? 10 : 11,
+            fontFamily: "monospace",
+            letterSpacing: 1,
+            fontWeight: "700",
+          },
         });
-        badge.anchor.set(0.5, 0);
-        badge.y = bh / 2 + 8;
+        badge.anchor.set(0.5, compact ? 0.5 : 0);
+        badge.y = compact ? 0 : bh / 2 + 8;
         badges[loc.id] = badge;
-        node.addChild(glow, base, windows, label, badge);
+        node.addChild(badge);
         buildingLayer.addChild(node);
       }
 
       rainLayer.removeChildren();
       rain.length = 0;
-      for (let i = 0; i < 90; i++) {
+      const drops = compact ? 0 : 90;
+      for (let i = 0; i < drops; i++) {
         const g = new Graphics().rect(0, 0, 1.4, 12).fill({ color: 0x5eead4, alpha: 0.12 });
         g.x = Math.random() * W;
         g.y = Math.random() * H;
@@ -191,6 +208,10 @@ export function NeonMap() {
 
     const drawPlayer = (t: Token, color: number) => {
       t.gfx.clear();
+      if (compact) {
+        t.gfx.circle(0, 0, 3.2).fill({ color }).stroke({ width: 1, color: 0x000000, alpha: 0.4 });
+        return;
+      }
       t.gfx.ellipse(0, 12, 11, 4).fill({ color: 0x000000, alpha: 0.35 });
       t.gfx.roundRect(-7, -6, 14, 18, 5).fill({ color });
       t.gfx.circle(0, -12, 6).fill({ color: 0xf1f5f9 });
@@ -199,6 +220,10 @@ export function NeonMap() {
 
     const drawNpc = (t: Token) => {
       t.gfx.clear();
+      if (compact) {
+        t.gfx.circle(0, 0, 3).fill({ color: 0xf59e0b });
+        return;
+      }
       t.gfx.ellipse(0, 12, 11, 4).fill({ color: 0x000000, alpha: 0.35 });
       t.gfx.roundRect(-7, -6, 14, 18, 4).fill({ color: 0xf59e0b, alpha: 0.9 });
       t.gfx.circle(0, -12, 6).fill({ color: 0xfde68a });
@@ -216,6 +241,7 @@ export function NeonMap() {
         });
         label.anchor.set(0.5, 0);
         label.y = 16;
+        label.visible = !compact;
         container.addChild(gfx, label);
         tokenLayer.addChild(container);
         t = { container, gfx, label, x: 0, y: 0, tx: 0, ty: 0, seed: rand(colorSeed) * 6.28 };
@@ -228,28 +254,33 @@ export function NeonMap() {
       const d = dataRef.current;
       const base = d.viewerDistrict ? districtPos[d.viewerDistrict] : null;
 
-      // district head-count badges (public, anonymous)
       for (const loc of CITY_MAP) {
         const badge = badges[loc.id];
-        if (!badge) continue;
-        const n = d.counts[loc.id] ?? 0;
-        badge.text = n > 0 ? `◍ ${n}` : "·";
-        badge.style.fill = n > 0 ? (DISTRICT_COLOR[loc.id] ?? 0xe2e8f0) : 0x334155;
+        if (badge) {
+          const n = d.counts[loc.id] ?? 0;
+          badge.text = compact ? (n > 0 ? String(n) : "") : n > 0 ? `◍ ${n}` : "·";
+          badge.style.fill = n > 0 ? (DISTRICT_COLOR[loc.id] ?? 0xe2e8f0) : 0x334155;
+        }
+        const ring = rings[loc.id];
+        if (ring) ring.alpha = loc.id === d.viewerDistrict ? 0.9 : 0;
       }
 
       const wanted = new Set<string>();
       let slot = 0;
+      const spread = compact ? 8 : 16;
+      const cols = compact ? 3 : 4;
       const place = () => {
-        const col = slot % 4;
-        const row = Math.floor(slot / 4);
+        const col = slot % cols;
+        const row = Math.floor(slot / cols);
         slot += 1;
         const bx = base ? base.x : W / 2;
         const by = base ? base.y : H / 2;
-        return { x: bx - 24 + col * 16, y: by + 46 + row * 22 };
+        const originX = bx - ((cols - 1) * spread) / 2;
+        const originY = by + (compact ? 16 : 46);
+        return { x: originX + col * spread, y: originY + row * (compact ? 9 : 22) };
       };
 
       if (base) {
-        // co-located players (share your room), including you
         for (const id of Object.keys(d.positions)) {
           const key = `p:${id}`;
           wanted.add(key);
@@ -259,11 +290,12 @@ export function NeonMap() {
           t.ty = target.y;
           const color = playerColor(id);
           drawPlayer(t, color);
-          const tag = id === d.me ? " ◂you" : d.humans.includes(id) ? "" : " ·ai";
-          t.label.text = (d.names[id] ?? id) + tag;
-          t.label.style.fill = color;
+          if (!compact) {
+            const tag = id === d.me ? " ◂you" : d.humans.includes(id) ? "" : " ·ai";
+            t.label.text = (d.names[id] ?? id) + tag;
+            t.label.style.fill = color;
+          }
         }
-        // co-located NPCs
         for (const [id, name] of Object.entries(d.npcsHere)) {
           const key = `n:${id}`;
           wanted.add(key);
@@ -272,8 +304,10 @@ export function NeonMap() {
           t.tx = target.x;
           t.ty = target.y;
           drawNpc(t);
-          t.label.text = name;
-          t.label.style.fill = 0xfbbf24;
+          if (!compact) {
+            t.label.text = name;
+            t.label.style.fill = 0xfbbf24;
+          }
         }
       }
 
@@ -295,7 +329,7 @@ export function NeonMap() {
         tok.x += (tok.tx - tok.x) * 0.14;
         tok.y += (tok.ty - tok.y) * 0.14;
         tok.container.x = tok.x;
-        tok.container.y = tok.y + Math.sin(t * 2 + tok.seed) * 1.6;
+        tok.container.y = tok.y + (compact ? 0 : Math.sin(t * 2 + tok.seed) * 1.6);
       }
       for (const node of buildingLayer.children) {
         const accent = (node as unknown as { _accent?: number })._accent;
@@ -318,7 +352,7 @@ export function NeonMap() {
       overlay
         .clear()
         .rect(0, 0, W, H)
-        .fill({ color: night ? 0x03040f : voting ? 0x1a0716 : 0x0a1020, alpha: night ? 0.55 : voting ? 0.3 : 0.14 });
+        .fill({ color: night ? 0x03040f : voting ? 0x1a0716 : 0x0a1020, alpha: night ? 0.5 : voting ? 0.3 : 0.14 });
       rainLayer.alpha = night ? 0.9 : 0.4;
     };
 
@@ -347,7 +381,7 @@ export function NeonMap() {
         /* already gone */
       }
     };
-  }, []);
+  }, [compact]);
 
   useEffect(() => {
     (hostRef.current as unknown as { _sync?: () => void })?._sync?.();

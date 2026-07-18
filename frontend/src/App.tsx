@@ -167,7 +167,7 @@ function GameScreen() {
                 <span className="h-1.5 w-1.5 rounded-full bg-neon-cyan" /> Sector Grid
               </p>
               <div className="relative h-[150px] w-full overflow-hidden rounded">
-                <NeonMap />
+                <NeonMap compact />
               </div>
             </div>
           </HologramCard>
