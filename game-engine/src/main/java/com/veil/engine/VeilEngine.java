@@ -1,12 +1,22 @@
 package com.veil.engine;
 
+import com.veil.chat.ChatChannel;
+import com.veil.chat.ChatMessage;
+import com.veil.chat.ChatPolicy;
 import com.veil.domain.action.GameAction;
+import com.veil.domain.player.Faction;
 import com.veil.domain.player.Player;
+import com.veil.domain.player.Role;
 import com.veil.events.EventBus;
+import com.veil.events.GameEndedEvent;
 import com.veil.events.GameEventListener;
 import com.veil.phases.GamePhase;
+import com.veil.phases.GamePhaseType;
 import com.veil.phases.NightPhase;
 import com.veil.phases.VotingPhase;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Orchestrator and single writer for one match. All commands funnel through here,
@@ -67,5 +77,73 @@ public class VeilEngine {
     public void advancePhase() {
         currentPhase = currentPhase.resolve(context, eventBus);
         currentPhase.onEnter(context, eventBus);
+    }
+
+    // --- Chat -----------------------------------------------------------------
+    // Chat is an IMMEDIATE path (not a Command / night action): it is not resolved in
+    // a batch, and DAY spans two phases. Legality is enforced here server-side via
+    // ChatPolicy — the same class DtoAssembler uses to filter reads — so send-rules and
+    // see-rules cannot drift. Membership (living Shadow, dead) is derived from live
+    // state on every call, so a Shadow who dies immediately loses SHADOW posting.
+
+    private final GamePhaseType currentPhaseType() {
+        return currentPhase == null ? GamePhaseType.LOBBY : currentPhase.type();
+    }
+
+    /**
+     * Post a chat line from a player. Returns false (and stores nothing) if the post is
+     * illegal for the sender's role, alive status, and the current phase.
+     */
+    public boolean postChat(String senderId, ChatChannel channel, String text) {
+        Player sender = context.players().get(senderId);
+        if (sender == null) return false;
+
+        Role role = sender.role().role();
+        boolean alive = sender.status().isAlive();
+        if (!ChatPolicy.canPost(role, alive, currentPhaseType(), channel)) return false;
+
+        context.privateState().postChatMessage(new ChatMessage(
+                senderId,
+                sender.displayName(),
+                channel,
+                currentPhaseType(),
+                context.tick(),
+                context.privateState().nextChatSeq(),
+                text
+        ));
+        return true;
+    }
+
+    /**
+     * Narrator / announcement line into the SYSTEM channel (readable by everyone).
+     * Reuses the confidential chat log so the frontend renders it inline with Day chat.
+     */
+    public void postSystemChat(String text) {
+        context.privateState().postChatMessage(new ChatMessage(
+                ChatMessage.SYSTEM_SENDER,
+                "Narrator",
+                ChatChannel.SYSTEM,
+                currentPhaseType(),
+                context.tick(),
+                context.privateState().nextChatSeq(),
+                text
+        ));
+    }
+
+    // --- Game end (leaderboard trigger) --------------------------------------
+
+    /**
+     * One-line helper to end the match: derives the final per-player snapshot from live
+     * state and publishes a {@link GameEndedEvent}. The engine (which may read state)
+     * builds the payload here; the leaderboard listener consumes only the event.
+     */
+    public void publishGameEnded(Faction winningFaction) {
+        List<GameEndedEvent.PlayerResult> results = new ArrayList<>();
+        for (Player p : context.players().values()) {
+            Role role = p.role().role();
+            results.add(new GameEndedEvent.PlayerResult(
+                    p.id(), p.displayName(), role, role.faction(), p.status().isAlive()));
+        }
+        eventBus.publish(new GameEndedEvent(context.tick(), winningFaction, results));
     }
 }
