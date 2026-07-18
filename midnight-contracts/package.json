@@ -1,0 +1,12 @@
+{
+  "name": "@veil/midnight-contracts",
+  "version": "0.1.0",
+  "description": "Confidential layer for Veil Protocol: Compact contracts + a runnable, zero-dependency demonstration of how player roles are hidden.",
+  "type": "module",
+  "engines": {
+    "node": ">=23"
+  },
+  "scripts": {
+    "demo": "node src/demo.ts"
+  }
+}

@@ -1,0 +1,48 @@
+pragma language_version >= 0.23;
+
+import CompactStandardLibrary;
+
+// =============================================================================
+// RolePrivacy — hide each player's secret role on Midnight.
+//
+// The three-part Midnight model:
+//   * PUBLIC ledger  : only a per-player COMMITMENT (a hash). The role is never here.
+//   * PRIVATE witness: the real role + a blinding salt, held only on the player's device.
+//   * ZK circuit     : proves properties about the private role without revealing it.
+//
+// Role encoding (kept private):  0 = SHADOW, 1 = ORACLE, 2 = AEGIS, 3 = CITIZEN
+// Faction rule: roles 1..3 are the CITY faction; role 0 is the SHADOW faction.
+// =============================================================================
+
+// On-chain, replicated to everyone: playerId -> commitment. No roles stored, ever.
+export ledger roleCommitments: Map<Bytes<32>, Bytes<32>>;
+
+// Off-chain, local to each player's machine. Supplied by the TypeScript DApp.
+witness localRole(): Uint<8>;
+witness localSalt(): Bytes<32>;
+
+// A hiding + binding commitment to a role. The salt makes it impossible to brute-force
+// the role out of the hash even though there are only four possible role values.
+circuit roleHash(role: Uint<8>, salt: Bytes<32>): Bytes<32> {
+  return persistentHash<Vector<2, Bytes<32>>>([(role as Field) as Bytes<32>, salt]);
+}
+
+// Publish ONLY the commitment. `disclose` is required because the value derives from
+// witness data; here we intentionally reveal just the hash, not the role.
+export circuit registerRole(playerId: Bytes<32>): [] {
+  const commitment = roleHash(localRole(), localSalt());
+  roleCommitments.insert(disclose(playerId), disclose(commitment));
+}
+
+// Prove the caller is in the CITY faction WITHOUT revealing which of the three city
+// roles they hold. The only thing that leaks is a single bit: "yes, city faction".
+export circuit proveCityMembership(playerId: Bytes<32>): [] {
+  const role = localRole();
+
+  // 1) The private role must match what was committed publicly.
+  assert(disclose(roleCommitments.lookup(disclose(playerId)) == roleHash(role, localSalt())),
+         "role commitment mismatch");
+
+  // 2) The proven property: role is a city role (1..3). Nothing else is disclosed.
+  assert(disclose(role >= 1 && role <= 3), "not a city faction member");
+}

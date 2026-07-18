@@ -1,0 +1,59 @@
+pragma language_version >= 0.23;
+
+import CompactStandardLibrary;
+
+// =============================================================================
+// ActionVerifier — prove a night action was legal WITHOUT revealing the secret
+// role or the private target.
+//
+// Two examples that map directly onto the Java engine's action validation:
+//   * submitShadowAttack : proves "a committed Shadow authorized this attack" while
+//                          the target stays a hidden commitment on-chain.
+//   * proveInvestigation : an Oracle proves it learned a target's FACTION bit that is
+//                          consistent with the target's public commitment — revealing
+//                          only the faction, never the exact role.
+// =============================================================================
+
+export ledger roleCommitments: Map<Bytes<32>, Bytes<32>>;
+
+// actionId -> commitment binding the (target, nonce). The plaintext target is hidden.
+export ledger nightActions: Map<Bytes<32>, Bytes<32>>;
+
+// Publicly recorded, minimal investigation output: targetId -> revealed faction (0/1).
+export ledger investigationFacts: Map<Bytes<32>, Uint<8>>;
+
+witness localRole(): Uint<8>;
+witness localSalt(): Bytes<32>;
+witness actionNonce(): Bytes<32>;
+
+// Provided by the target's device when they consent to being read (or by escrow):
+witness targetRole(): Uint<8>;
+witness targetSalt(): Bytes<32>;
+
+circuit roleHash(role: Uint<8>, salt: Bytes<32>): Bytes<32> {
+  return persistentHash<Vector<2, Bytes<32>>>([(role as Field) as Bytes<32>, salt]);
+}
+
+// A Shadow submits an attack. The ZK proof guarantees the submitter is the committed
+// Shadow and binds them to a specific (hidden) target, but the ledger only stores
+// opaque commitments — the role and target never appear in the clear.
+export circuit submitShadowAttack(actionId: Bytes<32>, playerId: Bytes<32>, target: Bytes<32>): [] {
+  assert(disclose(roleCommitments.lookup(disclose(playerId)) == roleHash(localRole(), localSalt())),
+         "role commitment mismatch");
+
+  // Proven privately: the submitter really is the Shadow (role 0). Never revealed.
+  assert(disclose(localRole() == 0), "only the Shadow may attack");
+
+  const bound = persistentHash<Vector<2, Bytes<32>>>([target, actionNonce()]);
+  nightActions.insert(disclose(actionId), disclose(bound));
+}
+
+// Oracle investigation with SELECTIVE disclosure: prove the target's committed role,
+// then reveal ONLY its faction bit (0 = SHADOW faction, 1 = CITY faction).
+export circuit proveInvestigation(targetId: Bytes<32>): [] {
+  assert(disclose(roleCommitments.lookup(disclose(targetId)) == roleHash(targetRole(), targetSalt())),
+         "target commitment mismatch");
+
+  const faction = targetRole() == 0 ? 0 : 1;
+  investigationFacts.insert(disclose(targetId), disclose(faction as Uint<8>));
+}
