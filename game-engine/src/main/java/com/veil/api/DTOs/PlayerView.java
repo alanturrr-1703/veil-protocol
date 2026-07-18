@@ -10,31 +10,49 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * The ONLY shape ever sent to a player client. It carries public state plus exactly
- * the confidential slice that belongs to this one viewer. Domain objects (Player,
- * NPC, PrivateState) never cross this boundary, so roles and memories cannot leak.
+ * The ONLY shape ever sent to a player client. It carries public state plus exactly the
+ * confidential slice that belongs to this one viewer. Domain objects never cross this
+ * boundary, so roles, memories — and now other operatives' exact whereabouts — cannot leak.
  *
- * @param viewerId            who this view was built for
- * @param phase               current phase name (public)
- * @param announcements       public announcements (public)
- * @param roster              playerId -> alive? (public)
- * @param names               playerId -> display name (public)
- * @param positions           playerId -> locationId (public; movement is public state)
- * @param humans              playerIds controlled by a human (public; the rest are AI)
- * @param ownRole             THIS viewer's own role (confidential to them)
- * @param ownInvestigations   THIS viewer's investigation results (confidential to them)
- * @param ownNpcAnswers       THIS viewer's NPC answers (confidential to them)
- * @param readableChat        chat lines THIS viewer may see (already filtered by ChatPolicy)
- * @param postableChannels    channels THIS viewer may post to right now
+ * <p><b>Location privacy:</b> who exists ({@code names}, {@code roster}) is public, but
+ * WHERE they are is not. You only receive the identities of players/NPCs who share your
+ * exact room ({@code positions}, {@code npcsHere}); everyone else is only visible as an
+ * anonymous head-count per district ({@code districtCounts}). Duck into a side room and you
+ * vanish from the commons.
+ *
+ * @param viewerId          who this view was built for
+ * @param phase             current phase name (public)
+ * @param phaseEndsAt       epoch millis the current phase auto-ends (0 = untimed)
+ * @param announcements     public announcements
+ * @param roster            playerId -> alive? (public)
+ * @param names             playerId -> display name (public)
+ * @param humans            human-controlled seats; the rest are AI
+ * @param districtCounts    districtId -> living occupant count (public, anonymous)
+ * @param viewerDistrict    the district THIS viewer is in
+ * @param viewerRoom        the room THIS viewer is in
+ * @param rooms             rooms of the viewer's current district: roomId -> name
+ * @param positions         VISIBLE players (share the viewer's room): playerId -> districtId
+ * @param npcsHere          NPCs sharing the viewer's room: npcId -> name
+ * @param ownRole           THIS viewer's own role (confidential to them)
+ * @param ownInvestigations THIS viewer's investigation results
+ * @param ownNpcAnswers     THIS viewer's NPC answers
+ * @param readableChat      chat lines THIS viewer may see (filtered by ChatPolicy)
+ * @param postableChannels  channels THIS viewer may post to right now
  */
 public record PlayerView(
         String viewerId,
         String phase,
+        long phaseEndsAt,
         List<String> announcements,
         Map<String, Boolean> roster,
         Map<String, String> names,
-        Map<String, String> positions,
         Set<String> humans,
+        Map<String, Integer> districtCounts,
+        String viewerDistrict,
+        String viewerRoom,
+        Map<String, String> rooms,
+        Map<String, String> positions,
+        Map<String, String> npcsHere,
         String ownRole,
         Map<String, Faction> ownInvestigations,
         Map<String, List<Observation>> ownNpcAnswers,

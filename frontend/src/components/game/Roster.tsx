@@ -43,7 +43,11 @@ export function Roster() {
                 </span>
               </span>
               <span className="text-[10px] text-slate-400">
-                {alive ? districtName(view.positions?.[id]) : "eliminated"}
+                {!alive
+                  ? "eliminated"
+                  : view.positions?.[id]
+                    ? districtName(view.positions[id])
+                    : "location unknown"}
               </span>
             </li>
           );

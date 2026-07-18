@@ -48,6 +48,7 @@ public class MoveAction implements GameAction {
         Location toLoc = ctx.city().location(toLocationId);
         toLoc.addPlayer(actorId);
         actor.setLocationId(toLocationId);
+        actor.setRoomId(Player.COMMONS); // entering a district drops you in the open commons
 
         bus.publish(new PlayerMovedEvent(ctx.tick(), actorId, from, toLocationId));
     }

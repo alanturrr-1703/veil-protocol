@@ -4,13 +4,13 @@ import { CITY_MAP, CITY_EDGES } from "../../types/Location";
 import { useGameStore } from "../../stores/gameStore";
 
 /**
- * A top-down 2D neon city rendered with PixiJS — think Stardew Valley by way of Blade
- * Runner. Tiled asphalt, glowing districts with lit windows, and little operative
- * characters that walk between districts. Everything animates on a ticker (glow pulse,
- * idle bob, rain), and the ambient light shifts with the phase (deep blue at Night).
+ * A top-down 2D neon city rendered with PixiJS — Stardew Valley by way of Blade Runner.
+ * Tiled asphalt, glowing districts with lit windows, rain, and phase-driven ambient light.
  *
- * It is purely a VIEW of public state: it reads `positions` (public), `roster`, `names`
- * and `humans` from the redacted PlayerView — never anything confidential.
+ * Crucially it respects location privacy: each district shows only an ANONYMOUS living
+ * head-count (public), while actual operative/NPC tokens are drawn ONLY for those who share
+ * your exact room (from the redacted `positions` / `npcsHere`). Slip into a side room and
+ * you disappear from everyone in the commons.
  */
 
 const DISTRICT_COLOR: Record<string, number> = {
@@ -22,17 +22,15 @@ const DISTRICT_COLOR: Record<string, number> = {
   garden: 0x34d399,
 };
 
-interface Avatar {
+interface Token {
   container: Container;
-  body: Graphics;
-  ring: Graphics;
-  nameText: Text;
+  gfx: Graphics;
+  label: Text;
   x: number;
   y: number;
   tx: number;
   ty: number;
   seed: number;
-  alive: boolean;
 }
 
 export function NeonMap() {
@@ -41,18 +39,26 @@ export function NeonMap() {
   const playerId = useGameStore((s) => s.playerId);
 
   const dataRef = useRef({
-    roster: {} as Record<string, boolean>,
+    counts: {} as Record<string, number>,
     positions: {} as Record<string, string>,
+    npcsHere: {} as Record<string, string>,
     names: {} as Record<string, string>,
     humans: [] as string[],
+    roster: {} as Record<string, boolean>,
+    viewerDistrict: null as string | null,
+    viewerRoom: null as string | null,
     phase: "LOBBY" as string,
     me: null as string | null,
   });
   dataRef.current = {
-    roster: view?.roster ?? {},
+    counts: view?.districtCounts ?? {},
     positions: view?.positions ?? {},
+    npcsHere: view?.npcsHere ?? {},
     names: view?.names ?? {},
     humans: view?.humans ?? [],
+    roster: view?.roster ?? {},
+    viewerDistrict: view?.viewerDistrict ?? null,
+    viewerRoom: view?.viewerRoom ?? null,
     phase: view?.phase ?? "LOBBY",
     me: playerId,
   };
@@ -62,15 +68,15 @@ export function NeonMap() {
     const app = new Application();
 
     const districtPos: Record<string, { x: number; y: number }> = {};
-    const avatars = new Map<string, Avatar>();
+    const badges: Record<string, Text> = {};
+    const tokens = new Map<string, Token>();
     let W = 0;
     let H = 0;
 
-    // Persistent layers (built once, repositioned on resize).
     const groundLayer = new Container();
     const roadLayer = new Container();
     const buildingLayer = new Container();
-    const avatarLayer = new Container();
+    const tokenLayer = new Container();
     const rainLayer = new Container();
     const overlay = new Graphics();
     const rain: { g: Graphics; speed: number }[] = [];
@@ -84,10 +90,8 @@ export function NeonMap() {
       W = app.screen.width;
       H = app.screen.height;
 
-      // --- Tiled asphalt ground with a faint neon grid ---
       groundLayer.removeChildren();
-      const bg = new Graphics().rect(0, 0, W, H).fill({ color: 0x070912 });
-      groundLayer.addChild(bg);
+      groundLayer.addChild(new Graphics().rect(0, 0, W, H).fill({ color: 0x070912 }));
       const grid = new Graphics();
       const step = 44;
       for (let x = 0; x <= W; x += step) grid.moveTo(x, 0).lineTo(x, H);
@@ -95,42 +99,34 @@ export function NeonMap() {
       grid.stroke({ width: 1, color: 0x1b2540, alpha: 0.6 });
       groundLayer.addChild(grid);
 
-      // District screen positions.
       for (const loc of CITY_MAP) districtPos[loc.id] = { x: loc.x * W, y: loc.y * H };
 
-      // --- Roads between districts ---
       roadLayer.removeChildren();
-      const roads = new Graphics();
       const glowRoads = new Graphics();
+      const roads = new Graphics();
+      const dashes = new Graphics();
       for (const [a, b] of CITY_EDGES) {
         const pa = districtPos[a];
         const pb = districtPos[b];
         if (!pa || !pb) continue;
         glowRoads.moveTo(pa.x, pa.y).lineTo(pb.x, pb.y);
         roads.moveTo(pa.x, pa.y).lineTo(pb.x, pb.y);
-      }
-      glowRoads.stroke({ width: 16, color: 0x14314a, alpha: 0.5 });
-      roads.stroke({ width: 4, color: 0x0e1a2e, alpha: 1 });
-      const dashes = new Graphics();
-      for (const [a, b] of CITY_EDGES) {
-        const pa = districtPos[a];
-        const pb = districtPos[b];
-        if (!pa || !pb) continue;
         const dx = pb.x - pa.x;
         const dy = pb.y - pa.y;
-        const len = Math.hypot(dx, dy);
-        const n = Math.floor(len / 22);
+        const n = Math.floor(Math.hypot(dx, dy) / 22);
         for (let i = 0; i < n; i += 2) {
-          const t0 = i / n;
-          const t1 = (i + 1) / n;
-          dashes.moveTo(pa.x + dx * t0, pa.y + dy * t0).lineTo(pa.x + dx * t1, pa.y + dy * t1);
+          dashes
+            .moveTo(pa.x + (dx * i) / n, pa.y + (dy * i) / n)
+            .lineTo(pa.x + (dx * (i + 1)) / n, pa.y + (dy * (i + 1)) / n);
         }
       }
+      glowRoads.stroke({ width: 16, color: 0x14314a, alpha: 0.5 });
+      roads.stroke({ width: 4, color: 0x0e1a2e });
       dashes.stroke({ width: 1.5, color: 0x2dd4bf, alpha: 0.35 });
       roadLayer.addChild(glowRoads, roads, dashes);
 
-      // --- Buildings (districts) ---
       buildingLayer.removeChildren();
+      for (const key of Object.keys(badges)) delete badges[key];
       for (const loc of CITY_MAP) {
         const c = DISTRICT_COLOR[loc.id] ?? 0x22d3ee;
         const p = districtPos[loc.id];
@@ -138,9 +134,8 @@ export function NeonMap() {
         node.x = p.x;
         node.y = p.y;
         (node as unknown as { _accent: number })._accent = c;
-
         const bw = 92;
-        const bh = 64;
+        const bh = 62;
         const glow = new Graphics()
           .roundRect(-bw / 2 - 8, -bh / 2 - 8, bw + 16, bh + 16, 12)
           .fill({ color: c, alpha: 0.08 });
@@ -148,18 +143,13 @@ export function NeonMap() {
           .roundRect(-bw / 2, -bh / 2, bw, bh, 8)
           .fill({ color: 0x0c1424 })
           .stroke({ width: 2, color: c, alpha: 0.9 });
-        // Lit windows.
         const windows = new Graphics();
-        const cols = 5;
-        const rows = 3;
-        for (let r = 0; r < rows; r++) {
-          for (let col = 0; col < cols; col++) {
+        for (let r = 0; r < 3; r++) {
+          for (let col = 0; col < 5; col++) {
             const on = rand(loc.x * 100 + r * 7 + col * 13) > 0.45;
-            const wx = -bw / 2 + 12 + col * ((bw - 24) / (cols - 1));
-            const wy = -bh / 2 + 14 + r * ((bh - 28) / (rows - 1));
-            windows
-              .rect(wx - 4, wy - 4, 8, 8)
-              .fill({ color: on ? c : 0x1a2338, alpha: on ? 0.9 : 0.5 });
+            const wx = -bw / 2 + 12 + col * ((bw - 24) / 4);
+            const wy = -bh / 2 + 14 + r * ((bh - 28) / 2);
+            windows.rect(wx - 4, wy - 4, 8, 8).fill({ color: on ? c : 0x1a2338, alpha: on ? 0.9 : 0.5 });
           }
         }
         const label = new Text({
@@ -168,11 +158,18 @@ export function NeonMap() {
         });
         label.anchor.set(0.5, 1);
         label.y = -bh / 2 - 12;
-        node.addChild(glow, base, windows, label);
+        // anonymous public head-count badge
+        const badge = new Text({
+          text: "",
+          style: { fill: 0xe2e8f0, fontSize: 11, fontFamily: "monospace", letterSpacing: 1 },
+        });
+        badge.anchor.set(0.5, 0);
+        badge.y = bh / 2 + 8;
+        badges[loc.id] = badge;
+        node.addChild(glow, base, windows, label, badge);
         buildingLayer.addChild(node);
       }
 
-      // --- Rain ---
       rainLayer.removeChildren();
       rain.length = 0;
       for (let i = 0; i < 90; i++) {
@@ -184,101 +181,129 @@ export function NeonMap() {
       }
     };
 
-    const accentFor = (id: string, alive: boolean, isMe: boolean, isHuman: boolean) => {
+    const playerColor = (id: string) => {
+      const { roster, humans, me } = dataRef.current;
+      const alive = roster[id] ?? true;
       if (!alive) return 0x475569;
-      if (isMe) return 0x22d3ee;
-      return isHuman ? 0x34d399 : 0xff2e97;
+      if (id === me) return 0x22d3ee;
+      return humans.includes(id) ? 0x34d399 : 0xff2e97;
     };
 
-    const drawAvatarBody = (av: Avatar, color: number, alive: boolean) => {
-      av.body.clear();
-      // shadow
-      av.body.ellipse(0, 12, 11, 4).fill({ color: 0x000000, alpha: 0.35 });
-      // body
-      av.body.roundRect(-7, -6, 14, 18, 5).fill({ color, alpha: alive ? 1 : 0.5 });
-      // head
-      av.body.circle(0, -12, 6).fill({ color: alive ? 0xf1f5f9 : 0x94a3b8, alpha: alive ? 1 : 0.5 });
-      // visor
-      av.body.rect(-4, -13, 8, 2.5).fill({ color, alpha: alive ? 1 : 0.4 });
+    const drawPlayer = (t: Token, color: number) => {
+      t.gfx.clear();
+      t.gfx.ellipse(0, 12, 11, 4).fill({ color: 0x000000, alpha: 0.35 });
+      t.gfx.roundRect(-7, -6, 14, 18, 5).fill({ color });
+      t.gfx.circle(0, -12, 6).fill({ color: 0xf1f5f9 });
+      t.gfx.rect(-4, -13, 8, 2.5).fill({ color });
     };
 
-    const syncAvatars = () => {
-      const { roster, positions, names, humans, me } = dataRef.current;
-      const ids = Object.keys(names);
-      // slot index per district for spacing characters out
-      const slotByDistrict: Record<string, number> = {};
+    const drawNpc = (t: Token) => {
+      t.gfx.clear();
+      t.gfx.ellipse(0, 12, 11, 4).fill({ color: 0x000000, alpha: 0.35 });
+      t.gfx.roundRect(-7, -6, 14, 18, 4).fill({ color: 0xf59e0b, alpha: 0.9 });
+      t.gfx.circle(0, -12, 6).fill({ color: 0xfde68a });
+      t.gfx.rect(-4, -13, 8, 2.5).fill({ color: 0x92400e });
+    };
 
-      for (const id of ids) {
-        const alive = roster[id] ?? true;
-        const isMe = id === me;
-        const isHuman = humans.includes(id);
-        const color = accentFor(id, alive, isMe, isHuman);
-        const district = positions[id] ?? CITY_MAP[0].id;
-        const base = districtPos[district] ?? { x: W / 2, y: H / 2 };
-        const slot = slotByDistrict[district] ?? 0;
-        slotByDistrict[district] = slot + 1;
+    const ensureToken = (key: string, colorSeed: number) => {
+      let t = tokens.get(key);
+      if (!t) {
+        const container = new Container();
+        const gfx = new Graphics();
+        const label = new Text({
+          text: "",
+          style: { fill: 0xffffff, fontSize: 10, fontFamily: "monospace", letterSpacing: 1 },
+        });
+        label.anchor.set(0.5, 0);
+        label.y = 16;
+        container.addChild(gfx, label);
+        tokenLayer.addChild(container);
+        t = { container, gfx, label, x: 0, y: 0, tx: 0, ty: 0, seed: rand(colorSeed) * 6.28 };
+        tokens.set(key, t);
+      }
+      return t;
+    };
+
+    const sync = () => {
+      const d = dataRef.current;
+      const base = d.viewerDistrict ? districtPos[d.viewerDistrict] : null;
+
+      // district head-count badges (public, anonymous)
+      for (const loc of CITY_MAP) {
+        const badge = badges[loc.id];
+        if (!badge) continue;
+        const n = d.counts[loc.id] ?? 0;
+        badge.text = n > 0 ? `◍ ${n}` : "·";
+        badge.style.fill = n > 0 ? (DISTRICT_COLOR[loc.id] ?? 0xe2e8f0) : 0x334155;
+      }
+
+      const wanted = new Set<string>();
+      let slot = 0;
+      const place = () => {
         const col = slot % 4;
         const row = Math.floor(slot / 4);
-        const tx = base.x - 24 + col * 16;
-        const ty = base.y + 44 + row * 22;
+        slot += 1;
+        const bx = base ? base.x : W / 2;
+        const by = base ? base.y : H / 2;
+        return { x: bx - 24 + col * 16, y: by + 46 + row * 22 };
+      };
 
-        let av = avatars.get(id);
-        if (!av) {
-          const container = new Container();
-          const body = new Graphics();
-          const ring = new Graphics();
-          const nameText = new Text({
-            text: "",
-            style: { fill: color, fontSize: 10, fontFamily: "monospace", letterSpacing: 1 },
-          });
-          nameText.anchor.set(0.5, 0);
-          nameText.y = 16;
-          container.addChild(ring, body, nameText);
-          container.x = tx;
-          container.y = ty;
-          avatarLayer.addChild(container);
-          av = { container, body, ring, nameText, x: tx, y: ty, tx, ty, seed: rand(ids.indexOf(id) + 1) * 6.28, alive };
-          avatars.set(id, av);
+      if (base) {
+        // co-located players (share your room), including you
+        for (const id of Object.keys(d.positions)) {
+          const key = `p:${id}`;
+          wanted.add(key);
+          const t = ensureToken(key, id.length + slot + 1);
+          const target = place();
+          t.tx = target.x;
+          t.ty = target.y;
+          const color = playerColor(id);
+          drawPlayer(t, color);
+          const tag = id === d.me ? " ◂you" : d.humans.includes(id) ? "" : " ·ai";
+          t.label.text = (d.names[id] ?? id) + tag;
+          t.label.style.fill = color;
         }
-        av.tx = tx;
-        av.ty = ty;
-        av.alive = alive;
-        drawAvatarBody(av, color, alive);
-        av.ring.clear();
-        if (isMe && alive) av.ring.circle(0, 2, 16).stroke({ width: 2, color, alpha: 0.7 });
-        const tag = isMe ? " ◂you" : isHuman ? "" : " ·ai";
-        av.nameText.text = (names[id] ?? id) + (alive ? tag : " ✝");
-        av.nameText.style.fill = color;
+        // co-located NPCs
+        for (const [id, name] of Object.entries(d.npcsHere)) {
+          const key = `n:${id}`;
+          wanted.add(key);
+          const t = ensureToken(key, id.length + slot + 7);
+          const target = place();
+          t.tx = target.x;
+          t.ty = target.y;
+          drawNpc(t);
+          t.label.text = name;
+          t.label.style.fill = 0xfbbf24;
+        }
       }
 
-      // remove avatars no longer present
-      for (const [id, av] of avatars) {
-        if (!ids.includes(id)) {
-          av.container.destroy();
-          avatars.delete(id);
+      for (const [key, t] of tokens) {
+        if (!wanted.has(key)) {
+          t.container.destroy();
+          tokens.delete(key);
         }
       }
     };
 
-    const tickerFn = () => {
+    const tick = () => {
       const t = performance.now() / 1000;
-      // avatars: ease toward target + idle bob
-      for (const av of avatars.values()) {
-        av.x += (av.tx - av.x) * 0.12;
-        av.y += (av.ty - av.y) * 0.12;
-        const bob = av.alive ? Math.sin(t * 2 + av.seed) * 1.6 : 0;
-        av.container.x = av.x;
-        av.container.y = av.y + bob;
+      for (const tok of tokens.values()) {
+        if (tok.x === 0 && tok.y === 0) {
+          tok.x = tok.tx;
+          tok.y = tok.ty;
+        }
+        tok.x += (tok.tx - tok.x) * 0.14;
+        tok.y += (tok.ty - tok.y) * 0.14;
+        tok.container.x = tok.x;
+        tok.container.y = tok.y + Math.sin(t * 2 + tok.seed) * 1.6;
       }
-      // building glow pulse
       for (const node of buildingLayer.children) {
-        const accent = (node as unknown as { _accent: number })._accent;
+        const accent = (node as unknown as { _accent?: number })._accent;
         if (accent !== undefined) {
           const glow = (node as Container).children[0] as Graphics;
           glow.alpha = 0.06 + (Math.sin(t * 1.5 + accent) * 0.5 + 0.5) * 0.08;
         }
       }
-      // rain
       for (const r of rain) {
         r.g.y += r.speed;
         r.g.x -= r.speed * 0.3;
@@ -287,33 +312,32 @@ export function NeonMap() {
           r.g.x = Math.random() * (W + 40);
         }
       }
-      // ambient day/night overlay
-      const night = dataRef.current.phase === "NIGHT";
-      const voting = dataRef.current.phase === "VOTING";
-      const targetAlpha = night ? 0.55 : voting ? 0.3 : 0.14;
-      const color = night ? 0x03040f : voting ? 0x1a0716 : 0x0a1020;
-      overlay.clear().rect(0, 0, W, H).fill({ color, alpha: targetAlpha });
+      const phase = dataRef.current.phase;
+      const night = phase === "NIGHT";
+      const voting = phase === "VOTING";
+      overlay
+        .clear()
+        .rect(0, 0, W, H)
+        .fill({ color: night ? 0x03040f : voting ? 0x1a0716 : 0x0a1020, alpha: night ? 0.55 : voting ? 0.3 : 0.14 });
       rainLayer.alpha = night ? 0.9 : 0.4;
     };
 
-    app
-      .init({ resizeTo: hostRef.current!, backgroundAlpha: 0, antialias: true })
-      .then(() => {
-        if (disposed) {
-          app.destroy(true);
-          return;
-        }
-        hostRef.current!.appendChild(app.canvas);
-        app.stage.addChild(groundLayer, roadLayer, buildingLayer, avatarLayer, rainLayer, overlay);
+    app.init({ resizeTo: hostRef.current!, backgroundAlpha: 0, antialias: true }).then(() => {
+      if (disposed) {
+        app.destroy(true);
+        return;
+      }
+      hostRef.current!.appendChild(app.canvas);
+      app.stage.addChild(groundLayer, roadLayer, buildingLayer, tokenLayer, rainLayer, overlay);
+      buildStatic();
+      sync();
+      (hostRef.current as unknown as { _sync?: () => void })._sync = sync;
+      app.renderer.on("resize", () => {
         buildStatic();
-        syncAvatars();
-        (hostRef.current as unknown as { _sync?: () => void })._sync = syncAvatars;
-        app.renderer.on("resize", () => {
-          buildStatic();
-          syncAvatars();
-        });
-        app.ticker.add(tickerFn);
+        sync();
       });
+      app.ticker.add(tick);
+    });
 
     return () => {
       disposed = true;
@@ -325,11 +349,9 @@ export function NeonMap() {
     };
   }, []);
 
-  // Re-sync avatars whenever the public snapshot changes.
   useEffect(() => {
-    const sync = (hostRef.current as unknown as { _sync?: () => void })?._sync;
-    sync?.();
-  }, [view?.positions, view?.roster, view?.names, view?.humans, playerId]);
+    (hostRef.current as unknown as { _sync?: () => void })?._sync?.();
+  }, [view?.positions, view?.npcsHere, view?.districtCounts, view?.roster, view?.viewerDistrict, playerId]);
 
   return <div ref={hostRef} className="h-full w-full" />;
 }

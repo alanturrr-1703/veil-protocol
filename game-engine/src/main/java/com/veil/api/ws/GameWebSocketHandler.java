@@ -5,6 +5,7 @@ import com.veil.api.session.GameService;
 import com.veil.api.session.GameSession;
 import com.veil.chat.ChatChannel;
 import com.veil.domain.action.AttackAction;
+import com.veil.domain.action.EnterRoomAction;
 import com.veil.domain.action.GameAction;
 import com.veil.domain.action.InvestigateAction;
 import com.veil.domain.action.MoveAction;
@@ -67,6 +68,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
 
         switch (intent.type() == null ? "" : intent.type().toUpperCase()) {
             case "MOVE" -> game.submit(new MoveAction(playerId, intent.toLocationId(), phase));
+            case "ENTER_ROOM" -> game.submit(new EnterRoomAction(playerId, intent.roomId(), phase));
             case "ATTACK" -> game.submit(new AttackAction(playerId, intent.targetId()));
             case "SHIELD" -> game.submit(new ShieldAction(playerId, intent.targetId()));
             case "INVESTIGATE" -> game.submit(new InvestigateAction(playerId, intent.targetId()));

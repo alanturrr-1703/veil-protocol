@@ -1,6 +1,7 @@
 package com.veil.domain.roles;
 
 import com.veil.domain.action.AttackAction;
+import com.veil.domain.action.EnterRoomAction;
 import com.veil.domain.action.GameAction;
 import com.veil.domain.action.MoveAction;
 import com.veil.domain.action.QueryNPCAction;
@@ -37,6 +38,7 @@ public class ShadowRole implements RoleStrategy {
     public boolean canPerform(GameAction action, GamePhaseType phase) {
         if (action instanceof AttackAction) return phase == GamePhaseType.NIGHT;
         if (action instanceof MoveAction) return phase == GamePhaseType.NIGHT || phase == GamePhaseType.DAY;
+        if (action instanceof EnterRoomAction) return phase == GamePhaseType.NIGHT || phase == GamePhaseType.DAY;
         if (action instanceof QueryNPCAction) return phase == GamePhaseType.NIGHT || phase == GamePhaseType.DAY;
         return false;
     }

@@ -3,8 +3,10 @@ package com.veil.api.DTOs;
 import com.veil.chat.ChatChannel;
 import com.veil.chat.ChatMessage;
 import com.veil.chat.ChatPolicy;
+import com.veil.domain.npc.NPC;
 import com.veil.domain.player.Player;
 import com.veil.domain.player.Role;
+import com.veil.domain.world.Location;
 import com.veil.engine.GameContext;
 import com.veil.phases.GamePhase;
 import com.veil.phases.GamePhaseType;
@@ -16,60 +18,98 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * The redaction boundary. This is the single place allowed to read from PrivateState,
- * and it only ever copies the slice belonging to the requesting viewer into a
- * {@link PlayerView}. If it compiles and only produces PlayerViews, confidential state
- * cannot be broadcast by accident.
+ * The redaction boundary. The single place allowed to read from PrivateState and from the
+ * raw world occupancy, it copies out ONLY what the requesting viewer is authorized to see:
+ * their own confidential slice, plus the whereabouts of players/NPCs who share their exact
+ * room. Everyone else is reduced to an anonymous per-district head-count.
  */
 public final class DtoAssembler {
 
     private DtoAssembler() {}
 
     public static PlayerView forViewer(GameContext ctx, GamePhase phase, String viewerId,
-                                       Set<String> humanIds) {
+                                       Set<String> humanIds, long phaseEndsAt) {
         Map<String, Boolean> roster = new LinkedHashMap<>();
         Map<String, String> names = new LinkedHashMap<>();
-        Map<String, String> positions = new LinkedHashMap<>();
         for (Player p : ctx.players().values()) {
             roster.put(p.id(), p.status().isAlive());
             names.put(p.id(), p.displayName());
-            positions.put(p.id(), p.locationId()); // movement is PUBLIC state
+        }
+
+        // Public but anonymous: how many living operatives are in each district.
+        Map<String, Integer> districtCounts = new LinkedHashMap<>();
+        for (Location loc : ctx.city().locations().values()) districtCounts.put(loc.id(), 0);
+        for (Player p : ctx.players().values()) {
+            if (p.status().isAlive()) districtCounts.merge(p.locationId(), 1, Integer::sum);
         }
 
         Player viewer = ctx.players().get(viewerId);
         String ownRole = viewer == null ? "UNKNOWN" : viewer.role().role().name();
+        String viewerDistrict = viewer == null ? null : viewer.locationId();
+        String viewerRoom = viewer == null ? null : viewer.roomId();
+
+        // Rooms of the viewer's current district (so the UI can offer doors to slip through).
+        Map<String, String> rooms = new LinkedHashMap<>();
+        Location here = viewerDistrict == null ? null : ctx.city().location(viewerDistrict);
+        if (here != null) rooms.putAll(here.rooms());
+
+        // VISIBLE players: those sharing the viewer's exact (district, room). Includes self.
+        Map<String, String> positions = new LinkedHashMap<>();
+        Map<String, String> npcsHere = new LinkedHashMap<>();
+        if (viewer != null && viewer.status().isAlive()) {
+            for (Player p : ctx.players().values()) {
+                if (!p.status().isAlive()) continue;
+                if (sameRoom(viewer, p)) positions.put(p.id(), p.locationId());
+            }
+            for (NPC n : ctx.npcs().values()) {
+                if (n.isAlive() && sameRoom(viewer, n.locationId(), n.roomId())) {
+                    npcsHere.put(n.id(), n.displayName());
+                }
+            }
+        }
 
         // Chat is confidential (PrivateState). It only leaves the engine here, filtered
-        // through ChatPolicy — the SAME class the engine uses to police posting — so
-        // what a viewer can send and what they can see are governed by one rule set.
+        // through ChatPolicy — the SAME class the engine uses to police posting.
         Role viewerRole = viewer == null ? null : viewer.role().role();
         boolean viewerAlive = viewer != null && viewer.status().isAlive();
         GamePhaseType phaseType = phase == null ? GamePhaseType.LOBBY : phase.type();
 
         List<ChatMessage> readableChat = new ArrayList<>();
         for (ChatMessage m : ctx.privateState().chatLog()) {
-            if (ChatPolicy.canRead(viewerRole, viewerAlive, m.channel())) {
-                readableChat.add(m);
-            }
+            if (ChatPolicy.canRead(viewerRole, viewerAlive, m.channel())) readableChat.add(m);
         }
         Set<ChatChannel> postableChannels =
                 ChatPolicy.postableChannels(viewerRole, viewerAlive, phaseType);
 
-        Set<String> humans = humanIds == null ? Set.of() : Set.copyOf(humanIds);
-
         return new PlayerView(
                 viewerId,
                 phase == null ? "NONE" : phase.type().name(),
+                phaseEndsAt,
                 ctx.publicState().announcements(),
                 roster,
-                names,                                          // public display names
-                positions,                                      // public locations
-                humans,                                         // human-controlled seats
-                ownRole,                                        // only the viewer's own role
-                ctx.privateState().investigationResults(viewerId), // only the viewer's results
-                ctx.privateState().npcAnswers(viewerId),           // only the viewer's answers
-                readableChat,                                   // only channels they may read
-                postableChannels                                // channels they may post to now
+                names,
+                humanIds == null ? Set.of() : Set.copyOf(humanIds),
+                districtCounts,
+                viewerDistrict,
+                viewerRoom,
+                rooms,
+                positions,                                          // only co-located players
+                npcsHere,                                           // only co-located NPCs
+                ownRole,
+                ctx.privateState().investigationResults(viewerId),
+                ctx.privateState().npcAnswers(viewerId),
+                readableChat,
+                postableChannels
         );
+    }
+
+    private static boolean sameRoom(Player viewer, Player other) {
+        return sameRoom(viewer, other.locationId(), other.roomId());
+    }
+
+    private static boolean sameRoom(Player viewer, String districtId, String roomId) {
+        return viewer.locationId() != null
+                && viewer.locationId().equals(districtId)
+                && viewer.roomId().equals(roomId);
     }
 }

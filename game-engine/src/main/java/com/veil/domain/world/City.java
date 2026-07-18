@@ -39,6 +39,11 @@ public class City {
         return adjacency.getOrDefault(from, Set.of()).contains(to);
     }
 
+    /** The districts directly connected to {@code id} (for movement / forced relocation). */
+    public Set<String> neighbors(String id) {
+        return adjacency.getOrDefault(id, Set.of());
+    }
+
     /** All locations whose position is within {@code radius} of the origin position. */
     public List<Location> locationsWithinRadius(Position origin, double radius) {
         List<Location> result = new ArrayList<>();

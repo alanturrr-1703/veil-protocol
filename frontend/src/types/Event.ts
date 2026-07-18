@@ -13,6 +13,7 @@ import type { ChatChannel } from "./Player";
 /** Intent messages the client sends over the WebSocket. */
 export type Intent =
   | { type: "MOVE"; toLocationId: string }
+  | { type: "ENTER_ROOM"; roomId: string }
   | { type: "ATTACK"; targetId: string }
   | { type: "SHIELD"; targetId: string }
   | { type: "INVESTIGATE"; targetId: string }

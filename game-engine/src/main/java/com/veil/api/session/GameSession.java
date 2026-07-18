@@ -33,6 +33,9 @@ public class GameSession {
     private final Map<String, WebSocketSession> viewers = new ConcurrentHashMap<>();
     // Seats a human has claimed. Everyone else is played by the AI (Ollama). Public info.
     private final Set<String> humanIds = ConcurrentHashMap.newKeySet();
+    // Epoch millis at which the current phase auto-advances (0 = untimed). Broadcast so
+    // clients can show a live countdown (e.g. the Shadows' 45-second window).
+    private volatile long phaseEndsAt = 0;
 
     public GameSession(String id, VeilEngine engine, ObjectMapper mapper) {
         this.id = id;
@@ -123,8 +126,16 @@ public class GameSession {
     }
 
     public synchronized PlayerView viewFor(String playerId) {
-        return DtoAssembler.forViewer(engine.context(), engine.currentPhase(), playerId, humanIds);
+        return DtoAssembler.forViewer(engine.context(), engine.currentPhase(), playerId, humanIds, phaseEndsAt);
     }
+
+    /** Set the countdown deadline for the current phase and push it to clients. */
+    public synchronized void setPhaseDeadline(long epochMillis) {
+        this.phaseEndsAt = epochMillis;
+        broadcast();
+    }
+
+    public long phaseEndsAt() { return phaseEndsAt; }
 
     public synchronized String currentPhase() {
         return engine.currentPhase() == null ? "NONE" : engine.currentPhase().type().name();

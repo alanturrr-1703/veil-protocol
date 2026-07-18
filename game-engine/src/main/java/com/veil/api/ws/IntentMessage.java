@@ -14,6 +14,7 @@ package com.veil.api.ws;
 public record IntentMessage(
         String type,
         String toLocationId,
+        String roomId,
         String targetId,
         String npcId,
         String topic,

@@ -19,6 +19,7 @@ public class NPC {
     private final Map<String, Double> trust = new HashMap<>();
 
     private String locationId;
+    private String roomId = "commons";
     private boolean alive = true;
     private boolean protectedThisNight = false;
 
@@ -36,6 +37,10 @@ public class NPC {
 
     public String locationId() { return locationId; }
     public void setLocationId(String locationId) { this.locationId = locationId; }
+
+    /** Which room within the district this NPC occupies; NPCs can hide off the commons. */
+    public String roomId() { return roomId; }
+    public void setRoomId(String roomId) { this.roomId = roomId; }
 
     public boolean isAlive() { return alive; }
     public void eliminate() { this.alive = false; }

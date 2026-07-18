@@ -23,11 +23,17 @@ export interface ChatMessage {
 export interface PlayerView {
   viewerId: string;
   phase: GamePhase;
+  phaseEndsAt: number; // epoch millis the phase auto-ends (0 = untimed)
   announcements: string[];
-  roster: Record<string, boolean>; // playerId -> alive
+  roster: Record<string, boolean>; // playerId -> alive (public)
   names: Record<string, string>; // playerId -> display name (public)
-  positions: Record<string, string>; // playerId -> locationId (public)
   humans: string[]; // human-controlled seats; the rest are AI
+  districtCounts: Record<string, number>; // districtId -> living count (public, anonymous)
+  viewerDistrict: string | null; // where the viewer is
+  viewerRoom: string | null; // which room the viewer is in
+  rooms: Record<string, string>; // rooms of the viewer's district: roomId -> name
+  positions: Record<string, string>; // VISIBLE players (share your room): playerId -> districtId
+  npcsHere: Record<string, string>; // NPCs sharing your room: npcId -> name
   ownRole: string;
   ownInvestigations: Record<string, string>; // targetId -> faction
   ownNpcAnswers: Record<string, Observation[]>; // npcId -> observations

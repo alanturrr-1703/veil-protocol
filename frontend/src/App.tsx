@@ -20,6 +20,8 @@ import { DirectorControls } from "./components/game/DirectorControls";
 import { ChatPanel } from "./components/chat/ChatPanel";
 import { Leaderboard } from "./components/game/Leaderboard";
 import { Roster } from "./components/game/Roster";
+import { Interior } from "./components/city/Interior";
+import { Countdown } from "./components/game/Countdown";
 import { HologramCard } from "./components/ui/HologramCard";
 
 function Title() {
@@ -134,10 +136,13 @@ function GameScreen() {
       <RoleReveal />
       <NightOverlay />
 
-      <header className="mb-4 flex items-center justify-between gap-4">
-        <div className="flex items-baseline gap-3">
-          <span className="text-2xl font-bold tracking-[0.3em] text-neon-cyan neon-text">VEIL</span>
-          <span className="text-xs uppercase tracking-[0.4em] text-neon-pink">neon city</span>
+      <header className="mb-4 flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div className="flex items-baseline gap-3">
+            <span className="text-2xl font-bold tracking-[0.3em] text-neon-cyan neon-text">VEIL</span>
+            <span className="text-xs uppercase tracking-[0.4em] text-neon-pink">neon city</span>
+          </div>
+          <Countdown />
         </div>
         <DirectorControls />
       </header>
@@ -163,6 +168,7 @@ function GameScreen() {
         </main>
 
         <aside className="space-y-4">
+          <Interior send={send} />
           <NPCDialogue send={send} />
           <EvidenceBoard />
           <Leaderboard refreshKey={leaderboardBump} />
