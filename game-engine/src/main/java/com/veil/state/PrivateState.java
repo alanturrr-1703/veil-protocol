@@ -1,10 +1,12 @@
 package com.veil.state;
 
+import com.veil.chat.ChatMessage;
 import com.veil.domain.action.GameAction;
 import com.veil.domain.npc.Observation;
 import com.veil.domain.player.Faction;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -22,6 +24,8 @@ public class PrivateState {
     private final Map<String, Map<String, Faction>> investigations = new HashMap<>();
     private final Map<String, Map<String, List<Observation>>> npcAnswers = new HashMap<>();
     private final Map<String, Integer> huntAttemptsRemaining = new HashMap<>();
+    private final List<ChatMessage> chatLog = new ArrayList<>();
+    private long chatSeq = 0;
 
     // --- Night action queue -------------------------------------------------
 
@@ -67,5 +71,22 @@ public class PrivateState {
 
     public int huntAttemptsRemaining(String shadowId, int max) {
         return huntAttemptsRemaining.getOrDefault(shadowId, max);
+    }
+
+    // --- Chat (confidential: filtered per-viewer only at the redaction boundary) ----
+
+    /** Next monotonic sequence number, ensuring stable ordering within a tick. */
+    public long nextChatSeq() {
+        return chatSeq++;
+    }
+
+    /** Append a chat line. Never broadcast raw; {@code DtoAssembler} filters it per viewer. */
+    public void postChatMessage(ChatMessage message) {
+        chatLog.add(message);
+    }
+
+    /** The full append-only chat log. Only the redaction boundary should read this. */
+    public List<ChatMessage> chatLog() {
+        return Collections.unmodifiableList(chatLog);
     }
 }

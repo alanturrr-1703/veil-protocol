@@ -1,10 +1,13 @@
 package com.veil.api.DTOs;
 
+import com.veil.chat.ChatChannel;
+import com.veil.chat.ChatMessage;
 import com.veil.domain.npc.Observation;
 import com.veil.domain.player.Faction;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * The ONLY shape ever sent to a player client. It carries public state plus exactly
@@ -18,6 +21,8 @@ import java.util.Map;
  * @param ownRole             THIS viewer's own role (confidential to them)
  * @param ownInvestigations   THIS viewer's investigation results (confidential to them)
  * @param ownNpcAnswers       THIS viewer's NPC answers (confidential to them)
+ * @param readableChat        chat lines THIS viewer may see (already filtered by ChatPolicy)
+ * @param postableChannels    channels THIS viewer may post to right now
  */
 public record PlayerView(
         String viewerId,
@@ -26,5 +31,7 @@ public record PlayerView(
         Map<String, Boolean> roster,
         String ownRole,
         Map<String, Faction> ownInvestigations,
-        Map<String, List<Observation>> ownNpcAnswers
+        Map<String, List<Observation>> ownNpcAnswers,
+        List<ChatMessage> readableChat,
+        Set<ChatChannel> postableChannels
 ) {}
