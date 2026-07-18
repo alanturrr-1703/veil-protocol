@@ -171,6 +171,25 @@ public class VeilEngine {
     }
 
     /**
+     * Append a raw DIRECT line to the chat log with an explicit sender name (e.g. an NPC that
+     * is not a Player). Used for NPC conversation, where co-location has already been checked
+     * by the caller. The redaction boundary still reveals it only to the sender and recipient.
+     */
+    public void postDirectRaw(String senderId, String senderName, String toId, String text) {
+        if (toId == null || text == null || text.isBlank()) return;
+        context.privateState().postChatMessage(new ChatMessage(
+                senderId,
+                senderName,
+                ChatChannel.DIRECT,
+                currentPhaseType(),
+                context.tick(),
+                context.privateState().nextChatSeq(),
+                text,
+                toId
+        ));
+    }
+
+    /**
      * Narrator / announcement line into the SYSTEM channel (readable by everyone).
      * Reuses the confidential chat log so the frontend renders it inline with Day chat.
      */

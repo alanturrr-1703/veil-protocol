@@ -1,6 +1,7 @@
 package com.veil.api.ws;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.veil.ai.agent.AiEngine;
 import com.veil.api.session.GameService;
 import com.veil.api.session.GameSession;
 import com.veil.chat.ChatChannel;
@@ -32,10 +33,12 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
 
     private final GameService games;
     private final ObjectMapper mapper;
+    private final AiEngine ai;
 
-    public GameWebSocketHandler(GameService games, ObjectMapper mapper) {
+    public GameWebSocketHandler(GameService games, ObjectMapper mapper, AiEngine ai) {
         this.games = games;
         this.mapper = mapper;
+        this.ai = ai;
     }
 
     @Override
@@ -70,10 +73,22 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             case "ATTACK" -> game.submit(new AttackAction(playerId, intent.targetId()));
             case "SHIELD" -> game.submit(new ShieldAction(playerId, intent.targetId()));
             case "INVESTIGATE" -> game.submit(new InvestigateAction(playerId, intent.targetId()));
-            case "QUERY_NPC" -> game.submit(new QueryNPCAction(playerId, intent.npcId(), intent.topic(), phase));
+            case "QUERY_NPC" -> {
+                game.submit(new QueryNPCAction(playerId, intent.npcId(), intent.topic(), phase));
+                ai.npcReply(game, playerId, intent.npcId(), intent.topic());
+            }
             case "VOTE" -> game.vote(playerId, intent.targetId());
-            case "CHAT" -> game.postChat(playerId, parseChannel(intent.channel()), intent.text());
-            case "WHISPER" -> game.postWhisper(playerId, intent.targetId(), intent.text());
+            case "CHAT" -> {
+                ChatChannel channel = parseChannel(intent.channel());
+                if (game.postChat(playerId, channel, intent.text())) {
+                    ai.reactToChat(game, playerId, channel, intent.text());
+                }
+            }
+            case "WHISPER" -> {
+                if (game.postWhisper(playerId, intent.targetId(), intent.text())) {
+                    ai.reactToWhisper(game, playerId, intent.targetId(), intent.text());
+                }
+            }
             case "POS" -> {
                 if (intent.x() != null && intent.y() != null) {
                     game.updatePosition(playerId, intent.x(), intent.y());

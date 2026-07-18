@@ -40,7 +40,11 @@ public class QueryNPCAction implements GameAction {
         Player actor = ctx.players().get(actorId);
         if (actor == null || !actor.status().isAlive()) return false;
         NPC npc = ctx.npcs().get(npcId);
-        return npc != null && npc.isAlive();
+        if (npc == null || !npc.isAlive()) return false;
+        // You must be face to face — same district AND same room — to question a witness.
+        return actor.locationId() != null
+                && actor.locationId().equals(npc.locationId())
+                && actor.roomId().equals(npc.roomId());
     }
 
     @Override

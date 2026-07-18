@@ -112,6 +112,16 @@ public class GameSession {
         return ok;
     }
 
+    /**
+     * Append one line of NPC conversation (either the player's question or the NPC's reply)
+     * as a private DIRECT line between {@code senderId} and {@code toId}, then re-push views.
+     * Co-location has already been checked by the caller (AiEngine).
+     */
+    public synchronized void postNpcLine(String senderId, String senderName, String toId, String text) {
+        engine.postDirectRaw(senderId, senderName, toId, text);
+        broadcast();
+    }
+
     /** Free-roam district move (allowed in any phase, including the lobby). */
     public synchronized boolean move(String playerId, String toLocationId) {
         boolean ok = engine.moveTo(playerId, toLocationId);
