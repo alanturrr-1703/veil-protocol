@@ -364,9 +364,9 @@ export function RoomScene({ send }: { send: (intent: Intent) => void }) {
     if (phase === "NIGHT") dawnKey.current = "";
   }, [phase, view?.lastNightVictims]);
 
-  // --- teleport (one jump to any district per night) ---------------------------
+  // --- teleport (your one district relocation per night) -----------------------
   const [teleOpen, setTeleOpen] = useState(false);
-  const canTeleport = !!view?.teleportAvailable && iAmAlive;
+  const canTeleport = !!view?.relocateAvailable && iAmAlive;
 
   if (!view || !view.viewerDistrict) return null;
 
@@ -407,12 +407,13 @@ export function RoomScene({ send }: { send: (intent: Intent) => void }) {
               ? "border-neon-cyan/60 bg-black/60 text-neon-cyan hover:bg-neon-cyan/10"
               : "border-white/10 bg-black/40 text-slate-500"
           }`}
-          title={canTeleport ? "Jump to any district (once per night)" : "Recharges at nightfall"}
+          title={canTeleport ? "Vanish to any district — your ONE relocation this night" : "Relocation spent — dodge between rooms to survive"}
         >
           ⚡ Teleport {canTeleport ? "· 1/night" : "· used"}
         </button>
         {teleOpen && canTeleport && (
           <div className="mt-1 w-44 rounded-md border border-neon-cyan/40 bg-black/90 p-1 backdrop-blur">
+            <p className="px-2 pb-1 pt-0.5 text-[8px] uppercase tracking-widest text-slate-500">Vanish (uses your night move)</p>
             {CITY_MAP.filter((l) => l.id !== view.viewerDistrict).map((l) => (
               <button
                 key={l.id}
@@ -619,7 +620,11 @@ export function RoomScene({ send }: { send: (intent: Intent) => void }) {
       </AnimatePresence>
 
       <p className="absolute bottom-1 right-2 text-[9px] text-slate-500">
-        {iAmAlive ? "WASD move · E whisper · ⚡ teleport · click to act" : "you are eliminated"}
+        {iAmAlive
+          ? (night
+              ? "hunted? duck through a door to dodge · ⚡ teleport early to vanish"
+              : "WASD move · E whisper · ⚡ teleport · click to act")
+          : "you are eliminated"}
       </p>
     </div>
   );

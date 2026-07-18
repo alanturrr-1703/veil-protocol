@@ -43,7 +43,7 @@ export interface PlayerView {
   postableChannels: ChatChannel[]; // channels this viewer may post to now
   roomAttacks: AttackFx[]; // strikes in YOUR room, witnessed live (attacker shown)
   lastNightVictims: string[]; // who fell last night — the public dawn reveal
-  teleportAvailable: boolean; // whether you still have your one nightly teleport
+  relocateAvailable: boolean; // whether you still have your one nightly district relocation
 }
 
 /** A visible strike — mirrors the Java `AttackFx` record. Only sent to co-located witnesses. */

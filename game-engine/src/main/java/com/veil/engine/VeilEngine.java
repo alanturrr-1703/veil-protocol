@@ -78,13 +78,14 @@ public class VeilEngine {
     }
 
     /**
-     * The one teleport each operative gets per night: an instant jump to ANY district (not
-     * just an adjacent one), consuming the allowance. Lands you in the open commons. Allowed
-     * in any phase; the allowance refreshes at nightfall.
+     * The teleport half of the one-per-night relocation: an instant jump to ANY district (not
+     * just an adjacent one), consuming the allowance. Lands you in the open commons. This is
+     * the "lots of time left — vanish so the Shadow can't find me" escape. Allowed in any
+     * phase; the allowance refreshes at nightfall.
      */
     public boolean teleport(String playerId, String toLocationId) {
         Player p = context.players().get(playerId);
-        if (p == null || !p.status().isAlive() || !p.teleportAvailable()) return false;
+        if (p == null || !p.status().isAlive() || !p.relocateAvailable()) return false;
         if (toLocationId == null || toLocationId.equals(p.locationId())) return false;
         com.veil.domain.world.Location to = context.city().location(toLocationId);
         if (to == null) return false;
@@ -96,21 +97,28 @@ public class VeilEngine {
         p.setLocationId(toLocationId);
         p.setRoomId(Player.COMMONS);
         p.setPosition(0.5, 0.6);
-        p.setTeleportAvailable(false);
+        p.setRelocateAvailable(false);
         eventBus.publish(new com.veil.events.PlayerMovedEvent(context.tick(), playerId, fromId, toLocationId));
         return true;
     }
 
     /**
-     * Free-roam movement, decoupled from the turn engine so players (and AI) can wander the
-     * map in ANY phase — including the lobby, before the match has started. Still validated
-     * (must be alive; districts must be adjacent), just not gated by phase/role.
+     * Free-roam district movement (walk to an ADJACENT district). During the NIGHT this is
+     * the same one-per-night relocation as teleport — you may leave your district only once,
+     * so a hunted player must choose between fleeing early and dodging between rooms late.
+     * During the day (and lobby) it's unrestricted so the city can regroup and de-camp.
      */
     public boolean moveTo(String playerId, String toLocationId) {
+        Player p = context.players().get(playerId);
+        if (p == null || !p.status().isAlive()) return false;
+        boolean night = currentPhaseType() == GamePhaseType.NIGHT;
+        if (night && !p.relocateAvailable()) return false;
+
         com.veil.domain.action.MoveAction a =
                 new com.veil.domain.action.MoveAction(playerId, toLocationId, currentPhaseType());
         if (!a.validate(context)) return false;
         a.execute(context, eventBus);
+        if (night) p.setRelocateAvailable(false);
         return true;
     }
 

@@ -35,11 +35,11 @@ public class NightPhase implements GamePhase {
         ctx.advanceTick();
         ctx.publicState().addAnnouncement("Night falls over Neon City.");
         // Fresh night: clear the previous dawn's reveal + strike animations, and grant
-        // everyone their one teleport for the night.
+        // everyone their one district relocation (move OR teleport) for the night.
         ctx.publicState().clearNightVictims();
         ctx.privateState().clearAttackFx();
         for (Player p : ctx.players().values()) {
-            if (p.status().isAlive()) p.setTeleportAvailable(true);
+            if (p.status().isAlive()) p.setRelocateAvailable(true);
         }
         enforceNoCamping(ctx);
     }

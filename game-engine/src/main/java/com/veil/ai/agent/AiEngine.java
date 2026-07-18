@@ -74,32 +74,11 @@ public class AiEngine {
 
     private void runNight(GameSession session) {
         GameContext ctx = session.context();
-        List<Player> alive = aliveAiPlayers(session);
 
-        List<Player> shadows = new ArrayList<>();
-        List<Player> cityTargets = new ArrayList<>();
-        for (Player p : allAlive(ctx)) {
-            if (p.role().role().faction() == Faction.SHADOW) shadows.add(p);
-            else cityTargets.add(p);
-        }
-
-        // Shadows (mafia) coordinate a single kill. A Shadow can only strike in their OWN
-        // room, so the AI first closes the distance — using its nightly teleport to reach the
-        // victim's district if needed — then slips into their room and strikes. Killing where
-        // bystanders stand will expose it, so it prefers a victim who is alone.
-        Player aiShadow = firstAi(session, shadows);
-        if (aiShadow != null && !cityTargets.isEmpty()) {
-            Player victim = pickVictim(ctx, cityTargets);
-            if (!sameRoom(aiShadow, victim)) {
-                if (!aiShadow.locationId().equals(victim.locationId())) {
-                    session.teleport(aiShadow.id(), victim.locationId());
-                }
-                session.enterRoom(aiShadow.id(), victim.roomId());
-            }
-            session.submit(new AttackAction(aiShadow.id(), victim.id()));
-        }
-
-        for (Player p : alive) {
+        // The Oracle and Aegis act at nightfall (their effects don't depend on where anyone
+        // stands). The Shadows' kill is deliberately deferred to LATE in the night — see
+        // runNightStrike — so a victim who is paying attention can still dodge away.
+        for (Player p : aliveAiPlayers(session)) {
             Role role = p.role().role();
             if (role == Role.ORACLE) {
                 Player target = pickInvestigation(session, ctx, p);
@@ -113,6 +92,37 @@ public class AiEngine {
                 }
             }
         }
+    }
+
+    /**
+     * The Shadows' kill, fired only in the closing seconds of the night. A Shadow can strike
+     * only in its OWN room, so it closes the distance — teleporting to reach the victim's
+     * district if needed — slips into their room, and strikes. Because this happens late, a
+     * human target who spots the strike (or has already fled) can still escape by ducking into
+     * another room before dawn; the kill is re-validated at resolution. The AI prefers a
+     * victim who is alone, since killing in front of witnesses exposes it.
+     */
+    public void runNightStrike(GameSession session) {
+        if (session.phaseType() != GamePhaseType.NIGHT) return;
+        GameContext ctx = session.context();
+
+        List<Player> shadows = new ArrayList<>();
+        List<Player> cityTargets = new ArrayList<>();
+        for (Player p : allAlive(ctx)) {
+            if (p.role().role().faction() == Faction.SHADOW) shadows.add(p);
+            else cityTargets.add(p);
+        }
+        Player aiShadow = firstAi(session, shadows);
+        if (aiShadow == null || cityTargets.isEmpty()) return;
+
+        Player victim = pickVictim(ctx, cityTargets);
+        if (!sameRoom(aiShadow, victim)) {
+            if (!aiShadow.locationId().equals(victim.locationId())) {
+                session.teleport(aiShadow.id(), victim.locationId());
+            }
+            session.enterRoom(aiShadow.id(), victim.roomId());
+        }
+        session.submit(new AttackAction(aiShadow.id(), victim.id()));
     }
 
     /** Prefer a victim who is alone in their room (quiet kill); otherwise anyone. */

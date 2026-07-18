@@ -48,7 +48,21 @@ public class AttackAction implements GameAction {
         Player attacker = ctx.players().get(actorId);
         if (attacker == null || !attacker.status().isAlive()) return false;
         if (attacker.role().faction() != Faction.SHADOW) return false;
-        return ctx.players().containsKey(targetId) || ctx.npcs().containsKey(targetId);
+
+        Player targetPlayer = ctx.players().get(targetId);
+        if (targetPlayer != null) {
+            // Re-checked at dawn: the victim must STILL share the attacker's room. If they
+            // dodged into another room (or fled the district) after the strike was filed,
+            // they slip away — this is what lets a hunted player save themselves.
+            return targetPlayer.status().isAlive() && sameRoom(attacker, targetPlayer);
+        }
+        return ctx.npcs().containsKey(targetId); // NPC hunt proximity is checked in execute()
+    }
+
+    private boolean sameRoom(Player a, Player b) {
+        return a.locationId() != null
+                && a.locationId().equals(b.locationId())
+                && a.roomId().equals(b.roomId());
     }
 
     @Override

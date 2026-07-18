@@ -42,7 +42,7 @@ import java.util.Set;
  * @param postableChannels  channels THIS viewer may post to right now
  * @param roomAttacks       strikes happening in THIS viewer's room (witnessed live, attacker shown)
  * @param lastNightVictims  who fell last night — the public dawn reveal
- * @param teleportAvailable whether THIS viewer still has their one nightly teleport
+ * @param relocateAvailable whether THIS viewer still has their one nightly district relocation
  */
 public record PlayerView(
         String viewerId,
@@ -66,5 +66,5 @@ public record PlayerView(
         Set<ChatChannel> postableChannels,
         List<AttackFx> roomAttacks,
         List<String> lastNightVictims,
-        boolean teleportAvailable
+        boolean relocateAvailable
 ) {}

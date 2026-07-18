@@ -26,8 +26,9 @@ public class Player {
     // District this player occupied at the start of the previous night; used to forbid
     // Citizens/Oracle from camping the same district two nights running.
     private String lastNightDistrict;
-    // Everyone gets ONE teleport (jump to any district) per night; reset each nightfall.
-    private boolean teleportAvailable = true;
+    // ONE district relocation per night — spent by either walking to an adjacent district
+    // or teleporting to any district. Room changes are always free. Reset each nightfall.
+    private boolean relocateAvailable = true;
 
     public Player(String id, String displayName, RoleStrategy role, String locationId) {
         this.id = id;
@@ -63,6 +64,6 @@ public class Player {
     public String lastNightDistrict() { return lastNightDistrict; }
     public void setLastNightDistrict(String district) { this.lastNightDistrict = district; }
 
-    public boolean teleportAvailable() { return teleportAvailable; }
-    public void setTeleportAvailable(boolean available) { this.teleportAvailable = available; }
+    public boolean relocateAvailable() { return relocateAvailable; }
+    public void setRelocateAvailable(boolean available) { this.relocateAvailable = available; }
 }

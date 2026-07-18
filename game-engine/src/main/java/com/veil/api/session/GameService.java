@@ -45,6 +45,9 @@ public class GameService {
     private static final long NIGHT_MS = 45_000;
     private static final long DAY_MS = 60_000;
     private static final long VOTING_MS = 30_000;
+    // The AI Shadows strike this long before dawn — late enough that a hunted player must
+    // stay alert and can dodge into another room in the final seconds to survive.
+    private static final long STRIKE_LEAD_MS = 8_000;
 
     private final ConfidentialGateway gateway;
     private final LeaderboardListener leaderboard;
@@ -55,6 +58,8 @@ public class GameService {
     // Per-game countdown that auto-advances the phase, giving the match a live clock.
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(4);
     private final Map<String, ScheduledFuture<?>> timers = new ConcurrentHashMap<>();
+    // Per-game one-shot that fires the AI Shadows' kill in the closing seconds of the night.
+    private final Map<String, ScheduledFuture<?>> strikes = new ConcurrentHashMap<>();
     // Per-game loop that makes AI-controlled operatives wander the map (even in the lobby).
     private final Map<String, ScheduledFuture<?>> wanderers = new ConcurrentHashMap<>();
     // Each AI's current stroll target within its room ("gameId:playerId" -> {tx,ty}), so it
@@ -200,6 +205,16 @@ public class GameService {
         ScheduledFuture<?> future =
                 scheduler.schedule(() -> advanceGame(session.id()), dur, TimeUnit.MILLISECONDS);
         timers.put(session.id(), future);
+
+        // The Shadows strike late in the night — giving a hunted player the whole night to
+        // relocate early, or the final seconds to dodge between rooms.
+        if (session.phaseType() == GamePhaseType.NIGHT) {
+            long lead = Math.max(500, dur - STRIKE_LEAD_MS);
+            ScheduledFuture<?> strike = scheduler.schedule(
+                    () -> { try { ai.runNightStrike(session); } catch (Exception ignored) {} },
+                    lead, TimeUnit.MILLISECONDS);
+            strikes.put(session.id(), strike);
+        }
     }
 
     private long durationMs(GamePhaseType phase) {
@@ -214,6 +229,8 @@ public class GameService {
     private void cancelTimer(String gameId) {
         ScheduledFuture<?> existing = timers.remove(gameId);
         if (existing != null) existing.cancel(false);
+        ScheduledFuture<?> strike = strikes.remove(gameId);
+        if (strike != null) strike.cancel(false);
     }
 
     /**
@@ -236,12 +253,15 @@ public class GameService {
     private void wander(String gameId, GameSession session) {
         try {
             GameContext ctx = session.context();
+            // At night the map holds still: AI operatives only shuffle within their room, so
+            // the Shadows' late strike can land and hunted players aren't saved by AI churn.
+            boolean night = session.phaseType() == GamePhaseType.NIGHT;
             for (Player p : ctx.players().values()) {
                 if (!p.status().isAlive() || session.isHuman(p.id())) continue;
                 double roll = rng.nextDouble();
 
                 // Rarely change district (to an ADJACENT one) — no more erratic map-hopping.
-                if (roll < 0.03) {
+                if (!night && roll < 0.03) {
                     var neighbors = new java.util.ArrayList<>(ctx.city().neighbors(p.locationId()));
                     if (!neighbors.isEmpty()) {
                         session.move(p.id(), neighbors.get(rng.nextInt(neighbors.size())));
@@ -250,7 +270,7 @@ public class GameService {
                     continue;
                 }
                 // Occasionally slip into another room in the same district.
-                if (roll < 0.055) {
+                if (!night && roll < 0.055) {
                     Location loc = ctx.city().location(p.locationId());
                     if (loc != null) {
                         var rooms = new java.util.ArrayList<>(loc.rooms().keySet());

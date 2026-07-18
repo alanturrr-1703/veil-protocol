@@ -101,7 +101,7 @@ public final class DtoAssembler {
         }
         // Public dawn reveal: who fell last night (everyone sees this, never who struck).
         List<String> lastNightVictims = new ArrayList<>(ctx.publicState().lastNightVictims());
-        boolean teleportAvailable = viewer != null && viewer.status().isAlive() && viewer.teleportAvailable();
+        boolean relocateAvailable = viewer != null && viewer.status().isAlive() && viewer.relocateAvailable();
 
         return new PlayerView(
                 viewerId,
@@ -125,7 +125,7 @@ public final class DtoAssembler {
                 postableChannels,
                 roomAttacks,
                 lastNightVictims,
-                teleportAvailable
+                relocateAvailable
         );
     }
 

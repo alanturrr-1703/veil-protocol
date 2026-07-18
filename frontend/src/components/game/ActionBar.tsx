@@ -22,6 +22,8 @@ export function ActionBar({ send }: Props) {
   };
 
   const action = roleAction[role];
+  // At night you may leave your district only ONCE (walk or teleport); rooms are unlimited.
+  const relocateLocked = isNight && view?.relocateAvailable === false;
 
   return (
     <HologramCard title="Night Ops" accent="amber">
@@ -48,12 +50,19 @@ export function ActionBar({ send }: Props) {
       )}
 
       <div className="mt-4">
-        <p className="mb-2 text-xs uppercase tracking-widest text-neon-cyan">Move</p>
+        <p className="mb-2 flex items-center justify-between text-xs uppercase tracking-widest text-neon-cyan">
+          <span>Move to adjacent district</span>
+          {isNight && (
+            <span className={relocateLocked ? "text-neon-pink" : "text-slate-500"}>
+              {relocateLocked ? "relocation spent" : "1 / night"}
+            </span>
+          )}
+        </p>
         <div className="grid grid-cols-3 gap-2">
           {CITY_MAP.map((loc) => (
             <button
               key={loc.id}
-              disabled={loc.id === here}
+              disabled={loc.id === here || relocateLocked}
               className={`btn justify-center text-[11px] ${loc.id === here ? "neon-border text-neon-cyan" : ""}`}
               onClick={() => send({ type: "MOVE", toLocationId: loc.id })}
             >
@@ -62,6 +71,11 @@ export function ActionBar({ send }: Props) {
             </button>
           ))}
         </div>
+        {isNight && (
+          <p className="mt-2 text-[10px] italic text-slate-500">
+            Rooms are unlimited — duck between them to dodge a Shadow. Leaving the district (walk or ⚡ teleport) costs your one night move.
+          </p>
+        )}
       </div>
     </HologramCard>
   );
