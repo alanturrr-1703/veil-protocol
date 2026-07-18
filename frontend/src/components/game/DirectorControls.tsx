@@ -1,16 +1,11 @@
 import { useGameStore } from "../../stores/gameStore";
 import { gameClient } from "../../api/gameClient";
-import { DEMO_PLAYERS } from "../../config";
 
 /**
- * Local "director" controls — drive phase transitions and hot-swap the viewing operative.
- * Switching operative reconnects the socket, which is the clearest way to SEE that each
- * viewer only ever receives their own confidential slice.
+ * Local "director" controls — drive phase transitions and resolve the match.
  */
 export function DirectorControls() {
   const gameId = useGameStore((s) => s.gameId);
-  const playerId = useGameStore((s) => s.playerId);
-  const setSession = useGameStore((s) => s.setSession);
   const bumpLeaderboard = useGameStore((s) => s.bumpLeaderboard);
   const setLastWinner = useGameStore((s) => s.setLastWinner);
   const lastWinner = useGameStore((s) => s.lastWinner);
@@ -37,18 +32,6 @@ export function DirectorControls() {
           {lastWinner === "UNDECIDED" ? "no winner yet" : `${lastWinner} win`}
         </span>
       )}
-
-      <span className="mx-2 h-4 w-px bg-white/10" />
-      <span className="uppercase tracking-widest text-slate-400">View as</span>
-      {DEMO_PLAYERS.map((p) => (
-        <button
-          key={p.id}
-          onClick={() => setSession(gameId, p.id)}
-          className={`btn ${playerId === p.id ? "neon-border text-neon-cyan" : ""}`}
-        >
-          {p.name}
-        </button>
-      ))}
 
       <span className="mx-2 h-4 w-px bg-white/10" />
       <button className="btn-danger" onClick={reset}>New City</button>
