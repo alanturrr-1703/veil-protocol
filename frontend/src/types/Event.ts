@@ -8,6 +8,8 @@ export interface Observation {
   suspects: string[];
 }
 
+import type { ChatChannel } from "./Player";
+
 /** Intent messages the client sends over the WebSocket. */
 export type Intent =
   | { type: "MOVE"; toLocationId: string }
@@ -15,4 +17,5 @@ export type Intent =
   | { type: "SHIELD"; targetId: string }
   | { type: "INVESTIGATE"; targetId: string }
   | { type: "QUERY_NPC"; npcId: string; topic: string }
-  | { type: "VOTE"; targetId: string };
+  | { type: "VOTE"; targetId: string }
+  | { type: "CHAT"; channel: ChatChannel; text: string };

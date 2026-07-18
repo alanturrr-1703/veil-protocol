@@ -9,11 +9,14 @@ package com.veil.api.ws;
  *   {"type":"ATTACK","targetId":"p4"}
  *   {"type":"QUERY_NPC","npcId":"n1","topic":"last night"}
  *   {"type":"VOTE","targetId":"p1"}
+ *   {"type":"CHAT","channel":"DAY","text":"I saw Vex near the docks"}
  */
 public record IntentMessage(
         String type,
         String toLocationId,
         String targetId,
         String npcId,
-        String topic
+        String topic,
+        String channel,
+        String text
 ) {}

@@ -17,6 +17,8 @@ import { RoleReveal } from "./components/game/RoleReveal";
 import { NightOverlay } from "./components/game/NightPhase";
 import { NPCDialogue } from "./components/npc/NPCDialogue";
 import { DirectorControls } from "./components/game/DirectorControls";
+import { ChatPanel } from "./components/chat/ChatPanel";
+import { Leaderboard } from "./components/game/Leaderboard";
 import { HologramCard } from "./components/ui/HologramCard";
 
 function Title() {
@@ -67,6 +69,9 @@ function Lobby() {
         </button>
         {error && <p className="mt-3 text-xs text-neon-pink">{error}</p>}
       </HologramCard>
+      <div className="w-full max-w-md">
+        <Leaderboard />
+      </div>
     </div>
   );
 }
@@ -104,6 +109,7 @@ function OperativeSelect() {
 function GameScreen() {
   const gameId = useGameStore((s) => s.gameId);
   const playerId = useGameStore((s) => s.playerId);
+  const leaderboardBump = useGameStore((s) => s.leaderboardBump);
   const { send } = useWebSocket(gameId, playerId);
 
   return (
@@ -132,12 +138,16 @@ function GameScreen() {
               <NeonMap />
             </div>
           </HologramCard>
-          <Timeline />
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            <Timeline />
+            <ChatPanel send={send} />
+          </div>
         </main>
 
         <aside className="space-y-4">
           <NPCDialogue send={send} />
           <EvidenceBoard />
+          <Leaderboard refreshKey={leaderboardBump} />
         </aside>
       </div>
     </div>

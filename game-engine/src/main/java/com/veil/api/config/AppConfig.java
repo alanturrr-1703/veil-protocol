@@ -2,6 +2,7 @@ package com.veil.api.config;
 
 import com.veil.confidential.ConfidentialGateway;
 import com.veil.confidential.MockConfidentialGateway;
+import com.veil.leaderboard.LeaderboardListener;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
@@ -19,6 +20,15 @@ public class AppConfig implements WebMvcConfigurer {
     @Bean
     public ConfidentialGateway confidentialGateway() {
         return new MockConfidentialGateway();
+    }
+
+    /**
+     * One shared analytics Observer for the whole server, so standings accumulate across
+     * every match. Registered on each new engine's EventBus by {@code GameService}.
+     */
+    @Bean
+    public LeaderboardListener leaderboardListener() {
+        return new LeaderboardListener();
     }
 
     /** Allow the Vite dev server to call the REST API during local development. */

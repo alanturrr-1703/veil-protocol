@@ -1,5 +1,5 @@
 import { API_BASE } from "../config";
-import type { PlayerView } from "../types/Player";
+import type { LeaderboardView, PlayerView } from "../types/Player";
 
 export interface CreateGameResponse {
   gameId: string;
@@ -31,4 +31,9 @@ export const gameClient = {
     post<{ target: string; faction: string }>(
       `/games/${id}/investigate?oracle=${oracle}&target=${target}`,
     ),
+  /** Ask the confidential layer (Midnight) to resolve a winner from the public alive-set. */
+  resolve: (id: string) =>
+    post<{ winner: string; decided: boolean }>(`/games/${id}/resolve`),
+  /** Public, ranked cross-match leaderboard. */
+  leaderboard: () => get<LeaderboardView>("/leaderboard"),
 };

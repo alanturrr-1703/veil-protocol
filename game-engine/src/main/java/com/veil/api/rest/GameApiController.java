@@ -81,4 +81,17 @@ public class GameApiController {
         Faction faction = games.investigate(id, oracle, target);
         return ResponseEntity.ok(Map.of("target", target, "faction", faction.name()));
     }
+
+    /**
+     * Ask the confidential layer (Midnight) to resolve the winner from the PUBLIC alive-set.
+     * If decided, the match ends and the leaderboard scores it; roles are never disclosed —
+     * only the winning faction is returned.
+     */
+    @PostMapping("/{id}/resolve")
+    public ResponseEntity<Map<String, Object>> resolve(@PathVariable String id) {
+        if (games.get(id) == null) return ResponseEntity.notFound().build();
+        Faction winner = games.resolveWinner(id);
+        boolean decided = winner == Faction.CITY || winner == Faction.SHADOW;
+        return ResponseEntity.ok(Map.of("winner", winner.name(), "decided", decided));
+    }
 }

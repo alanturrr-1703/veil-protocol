@@ -3,13 +3,18 @@ package com.veil.api.session;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.veil.api.DTOs.DtoAssembler;
 import com.veil.api.DTOs.PlayerView;
+import com.veil.chat.ChatChannel;
 import com.veil.domain.action.GameAction;
+import com.veil.domain.player.Faction;
+import com.veil.domain.player.Player;
 import com.veil.engine.VeilEngine;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 
 import java.io.IOException;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -63,6 +68,37 @@ public class GameSession {
 
     public synchronized void vote(String voterId, String targetId) {
         engine.castVote(voterId, targetId);
+    }
+
+    /**
+     * Post a chat line. Legality (role/alive/phase/channel) is enforced by the engine via
+     * {@code ChatPolicy}; on success every viewer gets a freshly redacted feed, so a SHADOW
+     * line never reaches a City viewer.
+     */
+    public synchronized boolean postChat(String senderId, ChatChannel channel, String text) {
+        boolean ok = engine.postChat(senderId, channel, text);
+        if (ok) broadcast();
+        return ok;
+    }
+
+    /** Public alive-set (roster is public state), used as input to the confidential winner check. */
+    public synchronized Set<String> alivePlayerIds() {
+        Set<String> alive = new LinkedHashSet<>();
+        for (Player p : engine.context().players().values()) {
+            if (p.status().isAlive()) alive.add(p.id());
+        }
+        return alive;
+    }
+
+    /**
+     * End the match on a winner the confidential layer resolved: announce it on the SYSTEM
+     * channel and publish the terminal event that the leaderboard observer consumes.
+     */
+    public synchronized void endMatch(Faction winner) {
+        engine.postSystemChat((winner == Faction.SHADOW ? "The Shadows" : "The City")
+                + " have won the match.");
+        engine.publishGameEnded(winner);
+        broadcast();
     }
 
     public synchronized PlayerView viewFor(String playerId) {

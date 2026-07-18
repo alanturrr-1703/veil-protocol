@@ -1,6 +1,7 @@
 package com.veil.api.session;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.veil.api.DTOs.LeaderboardView;
 import com.veil.confidential.ConfidentialGateway;
 import com.veil.domain.npc.NPC;
 import com.veil.domain.npc.Personality;
@@ -15,12 +16,15 @@ import com.veil.domain.world.Location;
 import com.veil.domain.world.Position;
 import com.veil.engine.GameContext;
 import com.veil.engine.VeilEngine;
+import com.veil.leaderboard.LeaderboardListener;
 import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 /**
  * Owns all live matches and bridges the engine to the confidential layer. When a game is
@@ -32,12 +36,14 @@ import java.util.concurrent.ConcurrentHashMap;
 public class GameService {
 
     private final ConfidentialGateway gateway;
+    private final LeaderboardListener leaderboard;
     private final ObjectMapper mapper;
     private final Map<String, GameSession> games = new ConcurrentHashMap<>();
     private final Map<String, Map<String, String>> commitments = new ConcurrentHashMap<>();
 
-    public GameService(ConfidentialGateway gateway, ObjectMapper mapper) {
+    public GameService(ConfidentialGateway gateway, LeaderboardListener leaderboard, ObjectMapper mapper) {
         this.gateway = gateway;
+        this.leaderboard = leaderboard;
         this.mapper = mapper;
     }
 
@@ -65,7 +71,12 @@ public class GameService {
         }
         commitments.put(id, gameCommitments);
 
-        GameSession session = new GameSession(id, new VeilEngine(ctx), mapper);
+        VeilEngine engine = new VeilEngine(ctx);
+        // Analytics Observer: the shared leaderboard accumulates standings across every
+        // match from the terminal GameEndedEvent — it never reads roles or game state.
+        engine.addListener(leaderboard);
+
+        GameSession session = new GameSession(id, engine, mapper);
         games.put(id, session);
         return session;
     }
@@ -81,5 +92,31 @@ public class GameService {
     /** Confidential Oracle investigation via the gateway — returns only a faction. */
     public Faction investigate(String gameId, String oracleId, String targetId) {
         return gateway.investigate(gameId + "/" + oracleId, gameId + "/" + targetId);
+    }
+
+    /**
+     * Ask the confidential layer who has won, from the PUBLIC alive-set only. The engine
+     * can't compute this without leaking roles, so it delegates to the gateway (Midnight).
+     * If a faction is decided, the match ends and the leaderboard scores it; otherwise the
+     * result is {@link Faction#NEUTRAL} and nothing is scored.
+     */
+    public Faction resolveWinner(String gameId) {
+        GameSession session = games.get(gameId);
+        if (session == null) return Faction.NEUTRAL;
+
+        Set<String> aliveNamespaced = session.alivePlayerIds().stream()
+                .map(pid -> gameId + "/" + pid)
+                .collect(Collectors.toSet());
+
+        Faction winner = gateway.resolveWinner(aliveNamespaced);
+        if (winner == Faction.CITY || winner == Faction.SHADOW) {
+            session.endMatch(winner);
+        }
+        return winner;
+    }
+
+    /** The public, ranked cross-match leaderboard (shared across all games). */
+    public LeaderboardView leaderboard() {
+        return leaderboard.view();
     }
 }

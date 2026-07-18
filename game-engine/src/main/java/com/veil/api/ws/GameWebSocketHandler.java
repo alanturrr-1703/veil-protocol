@@ -3,6 +3,7 @@ package com.veil.api.ws;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.veil.api.session.GameService;
 import com.veil.api.session.GameSession;
+import com.veil.chat.ChatChannel;
 import com.veil.domain.action.AttackAction;
 import com.veil.domain.action.GameAction;
 import com.veil.domain.action.InvestigateAction;
@@ -71,7 +72,17 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             case "INVESTIGATE" -> game.submit(new InvestigateAction(playerId, intent.targetId()));
             case "QUERY_NPC" -> game.submit(new QueryNPCAction(playerId, intent.npcId(), intent.topic(), phase));
             case "VOTE" -> game.vote(playerId, intent.targetId());
+            case "CHAT" -> game.postChat(playerId, parseChannel(intent.channel()), intent.text());
             default -> { /* unknown intent ignored */ }
+        }
+    }
+
+    private static ChatChannel parseChannel(String raw) {
+        if (raw == null) return ChatChannel.DAY;
+        try {
+            return ChatChannel.valueOf(raw.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return ChatChannel.DAY;
         }
     }
 

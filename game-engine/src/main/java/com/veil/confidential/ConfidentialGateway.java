@@ -3,6 +3,8 @@ package com.veil.confidential;
 import com.veil.domain.player.Faction;
 import com.veil.domain.player.Role;
 
+import java.util.Set;
+
 /**
  * The single seam between the authoritative Java engine and the confidential layer
  * (Midnight). The engine owns ALL public state; anything on the confidential list
@@ -50,4 +52,19 @@ public interface ConfidentialGateway {
      * (e.g. "the Shadow faction has been eliminated"). Mirrors a win-check circuit.
      */
     boolean verifyWin(Faction faction);
+
+    /**
+     * Confidentially resolve which faction (if any) has won, given ONLY the PUBLIC set of
+     * players still alive. Roles never leave the gateway: it intersects the public
+     * alive-set with its own private role commitments and discloses ONLY the winning
+     * faction — or {@link Faction#NEUTRAL} to mean "no winner yet". This mirrors a Midnight
+     * win-condition circuit whose public inputs are the alive commitments and whose private
+     * witness is each role, and which outputs (discloses) just the winner.
+     *
+     * <p>Because the winner depends on hidden roles, the authoritative Java engine cannot
+     * compute it without leaking; it delegates here and trusts the disclosed faction. This
+     * is precisely the leaderboard's trust anchor — a match is only scored on a win the
+     * confidential layer confirmed.
+     */
+    Faction resolveWinner(Set<String> alivePlayerIds);
 }

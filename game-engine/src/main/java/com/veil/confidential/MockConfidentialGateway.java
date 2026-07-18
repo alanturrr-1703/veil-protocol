@@ -9,6 +9,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.HexFormat;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -67,6 +68,24 @@ public class MockConfidentialGateway implements ConfidentialGateway {
         // Example: the CITY wins when no SHADOW-faction role remains.
         return faction == Faction.CITY ? secretRoles.values().stream().noneMatch(r -> r.faction() == Faction.SHADOW)
                 : anyAlive;
+    }
+
+    @Override
+    public Faction resolveWinner(Set<String> alivePlayerIds) {
+        // Only the PUBLIC alive-set crosses the boundary. We look up each alive player's
+        // secret role internally (never disclosed) and output only the winning faction.
+        long aliveShadows = alivePlayerIds.stream()
+                .map(secretRoles::get)
+                .filter(r -> r != null && r.faction() == Faction.SHADOW)
+                .count();
+        long aliveCity = alivePlayerIds.stream()
+                .map(secretRoles::get)
+                .filter(r -> r != null && r.faction() == Faction.CITY)
+                .count();
+
+        if (aliveShadows == 0) return Faction.CITY;          // every Shadow eliminated
+        if (aliveShadows >= aliveCity) return Faction.SHADOW; // Shadows reach parity
+        return Faction.NEUTRAL;                               // undecided — match continues
     }
 
     private String randomSalt() {
