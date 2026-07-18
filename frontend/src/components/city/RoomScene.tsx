@@ -249,7 +249,7 @@ export function RoomScene({ send }: { send: (intent: Intent) => void }) {
           : "linear-gradient(180deg,#0a1226 0%,#101a38 60%,#14203f 100%)",
       }}
     >
-      <div className="absolute right-6 top-4 h-8 w-8 rounded-full"
+      <div className="absolute left-1/2 top-5 h-8 w-8 -translate-x-1/2 rounded-full"
         style={{ background: night ? "#cbd5e1" : "#fde68a", boxShadow: night ? "0 0 24px #94a3b8" : "0 0 28px #fbbf24", opacity: 0.8 }} />
       <div className="absolute inset-x-0 bottom-0 h-2/3"
         style={{

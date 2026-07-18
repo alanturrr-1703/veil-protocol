@@ -156,15 +156,19 @@ function GameScreen() {
           <VotingPanel send={send} />
         </aside>
 
-        <main className="flex min-h-[60vh] flex-col gap-4">
-          <HologramCard title="Sector Grid" accent="cyan" className="relative min-h-[260px] flex-1">
-            <div className="absolute inset-3 top-10">
-              <NeonMap />
-            </div>
-          </HologramCard>
-          <HologramCard title="Room · Street Level" accent="violet" className="relative h-[240px]">
+        <main className="flex min-h-[70vh] flex-col gap-4">
+          <HologramCard title="Room · Street Level" accent="violet" className="relative min-h-[520px] flex-1">
             <div className="absolute inset-3 top-10">
               <RoomScene send={send} />
+            </div>
+            {/* Minimap inset: the top-down city, docked inside the room stage. */}
+            <div className="absolute right-5 top-12 z-30 w-[230px] rounded-lg border border-neon-cyan/40 bg-black/70 p-1.5 shadow-neon backdrop-blur">
+              <p className="mb-1 flex items-center gap-1.5 px-0.5 text-[9px] uppercase tracking-widest text-neon-cyan">
+                <span className="h-1.5 w-1.5 rounded-full bg-neon-cyan" /> Sector Grid
+              </p>
+              <div className="relative h-[150px] w-full overflow-hidden rounded">
+                <NeonMap />
+              </div>
             </div>
           </HologramCard>
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
