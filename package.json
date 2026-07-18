@@ -1,0 +1,10 @@
+{
+  "name": "veil-protocol",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Veil Protocol: Neon City — a cyberpunk confidential-information deduction game (Java engine + React frontend + Midnight confidential layer).",
+  "workspaces": [
+    "frontend",
+    "midnight-contracts"
+  ]
+}

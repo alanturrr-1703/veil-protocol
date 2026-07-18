@@ -1,0 +1,68 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-void-900 text-slate-200 font-mono antialiased;
+    background-image:
+      radial-gradient(circle at 20% 10%, rgba(34, 211, 238, 0.12), transparent 40%),
+      radial-gradient(circle at 85% 80%, rgba(255, 46, 151, 0.12), transparent 45%),
+      linear-gradient(rgba(148, 163, 184, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(148, 163, 184, 0.05) 1px, transparent 1px);
+    background-size: 100% 100%, 100% 100%, 40px 40px, 40px 40px;
+  }
+}
+
+@layer components {
+  .glass {
+    @apply border border-white/10 bg-white/5 backdrop-blur-md;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+
+  .glass-panel {
+    @apply glass rounded-2xl p-4;
+  }
+
+  .neon-text {
+    text-shadow: 0 0 8px rgba(34, 211, 238, 0.8), 0 0 20px rgba(34, 211, 238, 0.4);
+  }
+
+  .neon-text-pink {
+    text-shadow: 0 0 8px rgba(255, 46, 151, 0.8), 0 0 20px rgba(255, 46, 151, 0.4);
+  }
+
+  .neon-border {
+    @apply border border-neon-cyan/60;
+    box-shadow: 0 0 12px rgba(34, 211, 238, 0.4);
+  }
+
+  .btn {
+    @apply glass rounded-lg px-4 py-2 text-sm uppercase tracking-widest transition
+      hover:bg-white/10 hover:shadow-neon disabled:opacity-40 disabled:hover:shadow-none;
+  }
+
+  .btn-danger {
+    @apply btn text-neon-pink hover:shadow-neon-pink;
+  }
+
+  .chip {
+    @apply rounded-full border border-white/10 bg-black/30 px-2.5 py-1 text-xs;
+  }
+
+  .scanlines::after {
+    content: "";
+    @apply pointer-events-none absolute inset-0 rounded-2xl;
+    background: linear-gradient(rgba(34, 211, 238, 0.06), transparent 45%);
+  }
+}
