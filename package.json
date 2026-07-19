@@ -2,9 +2,16 @@
   "name": "veil-protocol",
   "version": "0.1.0",
   "private": true,
-  "description": "Veil Protocol: Neon City — a cyberpunk confidential-information deduction game (Java engine + React frontend + Midnight confidential layer).",
+  "description": "Veil Protocol: Neon City — a cyberpunk confidential social-deduction game. Hybrid architecture: Java (authoritative real-time server) + React (render-only client) + Ollama (NPC dialogue) + Midnight (confidential referee).",
   "workspaces": [
     "frontend",
-    "midnight-contracts"
-  ]
+    "midnight"
+  ],
+  "scripts": {
+    "dev:frontend": "npm --workspace frontend run dev",
+    "build:frontend": "npm --workspace frontend run build",
+    "demo:midnight": "npm --workspace @veil/midnight run demo",
+    "dev:backend": "mvn -f backend/pom.xml spring-boot:run",
+    "build:backend": "mvn -f backend/pom.xml -DskipTests package"
+  }
 }

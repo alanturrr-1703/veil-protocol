@@ -6,8 +6,9 @@ import type { PlayerView } from "../types/Player";
  * The client renders whatever it is given; it never computes or infers hidden information.
  */
 interface GameState {
-  gameId: string | null;
+  code: string | null; // the room code (also the server-side session id)
   playerId: string | null;
+  isHost: boolean;
   view: PlayerView | null;
   commitments: Record<string, string>;
   connected: boolean;
@@ -15,7 +16,7 @@ interface GameState {
   leaderboardBump: number; // increment to force a leaderboard re-fetch
   lastWinner: string | null; // faction the confidential layer last resolved
 
-  setSession: (gameId: string, playerId: string | null) => void;
+  setSession: (code: string, playerId: string | null, isHost: boolean) => void;
   setView: (view: PlayerView) => void;
   setCommitments: (c: Record<string, string>) => void;
   setConnected: (v: boolean) => void;
@@ -26,8 +27,9 @@ interface GameState {
 }
 
 export const useGameStore = create<GameState>((set) => ({
-  gameId: null,
+  code: null,
   playerId: null,
+  isHost: false,
   view: null,
   commitments: {},
   connected: false,
@@ -35,7 +37,7 @@ export const useGameStore = create<GameState>((set) => ({
   leaderboardBump: 0,
   lastWinner: null,
 
-  setSession: (gameId, playerId) => set({ gameId, playerId }),
+  setSession: (code, playerId, isHost) => set({ code, playerId, isHost }),
   setView: (view) => set({ view }),
   setCommitments: (commitments) => set({ commitments }),
   setConnected: (connected) => set({ connected }),
@@ -44,8 +46,9 @@ export const useGameStore = create<GameState>((set) => ({
   setLastWinner: (lastWinner) => set({ lastWinner }),
   reset: () =>
     set({
-      gameId: null,
+      code: null,
       playerId: null,
+      isHost: false,
       view: null,
       commitments: {},
       connected: false,

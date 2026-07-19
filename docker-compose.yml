@@ -1,0 +1,42 @@
+# Veil Protocol — local infrastructure for the HYBRID architecture.
+#
+# The Java backend is the authoritative real-time server and is normally run directly
+# (mvn spring-boot:run) for fast iteration. This compose file provides the two LOCAL
+# side services the backend talks to:
+#
+#   1. ollama          — local LLM that phrases NPC dialogue (never sees whole game state).
+#   2. midnight-proof  — Midnight proof server; the relayer submits confidential txs here.
+#
+# Everything runs locally. No cloud services.
+#
+#   docker compose up ollama            # NPC dialogue only (mock confidential gateway)
+#   docker compose up                   # full stack incl. Midnight proof server
+#
+services:
+  # --- Local LLM for NPC dialogue ------------------------------------------------
+  ollama:
+    image: ollama/ollama:latest
+    container_name: veil-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-models:/root/.ollama
+    # Pull a small model once the container is up:
+    #   docker exec -it veil-ollama ollama pull llama3.2:3b
+    restart: unless-stopped
+
+  # --- Midnight proof server -----------------------------------------------------
+  # The relayer (backend MidnightConfidentialGateway, Phase 4) submits confidential
+  # transactions and generates ZK proofs through this server. Image/tag is pinned via
+  # the .env value MIDNIGHT_PROOF_IMAGE so we can track the current testnet release.
+  midnight-proof:
+    image: ${MIDNIGHT_PROOF_IMAGE:-midnightnetwork/proof-server:latest}
+    container_name: veil-midnight-proof
+    ports:
+      - "6300:6300"
+    command: ["midnight-proof-server", "--network", "testnet"]
+    restart: unless-stopped
+    profiles: ["midnight"]   # only starts with:  docker compose --profile midnight up
+
+volumes:
+  ollama-models:

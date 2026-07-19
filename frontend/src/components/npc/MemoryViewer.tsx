@@ -1,10 +1,10 @@
 import type { Observation } from "../../types/Event";
-import { DEMO_PLAYERS } from "../../config";
-
-const nameOf = (id: string) => DEMO_PLAYERS.find((p) => p.id === id)?.name ?? id;
+import { useGameStore } from "../../stores/gameStore";
 
 /** Renders the memory fragments an NPC shared — including the fuzzy suspect list. */
 export function MemoryViewer({ observations }: { observations: Observation[] }) {
+  const names = useGameStore((s) => s.view?.names ?? {});
+  const nameOf = (id: string) => names[id] ?? id;
   if (!observations || observations.length === 0) {
     return <p className="text-xs text-slate-500">// no memories shared yet</p>;
   }

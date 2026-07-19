@@ -1,8 +1,5 @@
 import { HologramCard } from "../ui/HologramCard";
 import { useGameStore } from "../../stores/gameStore";
-import { DEMO_PLAYERS } from "../../config";
-
-const nameOf = (id: string) => DEMO_PLAYERS.find((p) => p.id === id)?.name ?? id;
 
 /**
  * Evidence board — the player's confidential investigation results (Oracle) surfaced from
@@ -10,6 +7,8 @@ const nameOf = (id: string) => DEMO_PLAYERS.find((p) => p.id === id)?.name ?? id
  */
 export function EvidenceBoard() {
   const investigations = useGameStore((s) => s.view?.ownInvestigations ?? {});
+  const names = useGameStore((s) => s.view?.names ?? {});
+  const nameOf = (id: string) => names[id] ?? id;
   const entries = Object.entries(investigations);
 
   return (

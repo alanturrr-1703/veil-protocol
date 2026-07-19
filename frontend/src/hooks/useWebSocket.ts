@@ -5,27 +5,28 @@ import type { PlayerView } from "../types/Player";
 import type { Intent } from "../types/Event";
 
 /**
- * Opens the WebSocket to the authoritative backend for a given (gameId, playerId), streams
+ * Opens the WebSocket to the authoritative backend for a given (room code, playerId), streams
  * redacted PlayerView snapshots into the store, and returns a `send` for client intents.
  *
  * Auto-reconnects: if the backend isn't up yet or restarts (a very common local-dev case),
  * the socket keeps retrying with a short backoff, so movement/chat recover on their own once
  * the server is back — no browser refresh needed.
  */
-export function useWebSocket(gameId: string | null, playerId: string | null) {
+export function useWebSocket(code: string | null, playerId: string | null) {
   const socketRef = useRef<WebSocket | null>(null);
   const setView = useGameStore((s) => s.setView);
   const setConnected = useGameStore((s) => s.setConnected);
 
   useEffect(() => {
-    if (!gameId || !playerId) return;
+    if (!code || !playerId) return;
 
     let closedByCleanup = false;
     let retry: ReturnType<typeof setTimeout> | null = null;
     let attempts = 0;
 
     const connect = () => {
-      const ws = new WebSocket(`${WS_BASE}?gameId=${gameId}&playerId=${playerId}`);
+      // The backend keys sessions by the room code (passed as the gameId query param).
+      const ws = new WebSocket(`${WS_BASE}?gameId=${code}&playerId=${playerId}`);
       socketRef.current = ws;
 
       ws.onopen = () => {
@@ -58,7 +59,7 @@ export function useWebSocket(gameId: string | null, playerId: string | null) {
       socketRef.current?.close();
       socketRef.current = null;
     };
-  }, [gameId, playerId, setView, setConnected]);
+  }, [code, playerId, setView, setConnected]);
 
   const send = (intent: Intent) => {
     const ws = socketRef.current;

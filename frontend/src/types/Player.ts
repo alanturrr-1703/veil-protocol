@@ -76,6 +76,7 @@ export type GamePhase =
   | "NIGHT"
   | "DAY"
   | "VOTING"
+  | "GAME_OVER"
   | "RESULT"
   | "NONE";
 

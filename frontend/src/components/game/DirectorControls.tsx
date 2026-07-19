@@ -1,40 +1,41 @@
+import { useEffect } from "react";
 import { useGameStore } from "../../stores/gameStore";
-import { gameClient } from "../../api/gameClient";
 
 /**
- * Local "director" controls — drive phase transitions and resolve the match.
+ * Match status bar. The match is server-driven: phases auto-advance on the backend clock and
+ * the confidential referee ends the game, so there are no manual advance/resolve controls.
+ * This shows the live phase, announces the winner at GAME_OVER (refreshing the leaderboard),
+ * and lets the player leave for a new room.
  */
 export function DirectorControls() {
-  const gameId = useGameStore((s) => s.gameId);
+  const phase = useGameStore((s) => s.view?.phase ?? "NONE");
+  const connected = useGameStore((s) => s.connected);
   const bumpLeaderboard = useGameStore((s) => s.bumpLeaderboard);
-  const setLastWinner = useGameStore((s) => s.setLastWinner);
-  const lastWinner = useGameStore((s) => s.lastWinner);
   const reset = useGameStore((s) => s.reset);
 
-  if (!gameId) return null;
+  const over = phase === "GAME_OVER";
 
-  const resolve = async () => {
-    const res = await gameClient.resolve(gameId);
-    setLastWinner(res.decided ? res.winner : "UNDECIDED");
-    if (res.decided) bumpLeaderboard();
-  };
+  // When the match ends, refresh the cross-match standings once.
+  useEffect(() => {
+    if (over) bumpLeaderboard();
+  }, [over, bumpLeaderboard]);
 
   return (
-    <div className="glass flex flex-wrap items-center gap-2 rounded-xl px-3 py-2 text-xs">
-      <span className="uppercase tracking-widest text-slate-400">Director</span>
-      <button className="btn" onClick={() => gameClient.start(gameId)}>Start</button>
-      <button className="btn" onClick={() => gameClient.advance(gameId)}>Advance ▸</button>
-      <button className="btn text-neon-amber" onClick={resolve} title="Confidentially resolve the winner via the Midnight layer">
-        ◈ Resolve (Midnight)
-      </button>
-      {lastWinner && (
+    <div className="glass flex flex-wrap items-center gap-3 rounded-xl px-3 py-2 text-xs">
+      <span className="flex items-center gap-1.5 uppercase tracking-widest text-slate-400">
+        <span
+          className={`h-1.5 w-1.5 rounded-full ${connected ? "bg-neon-lime" : "bg-neon-pink"}`}
+        />
+        {connected ? "linked" : "offline"}
+      </span>
+      <span className="uppercase tracking-widest text-neon-cyan">{phase}</span>
+      {over && (
         <span className="text-[10px] uppercase tracking-widest text-neon-amber">
-          {lastWinner === "UNDECIDED" ? "no winner yet" : `${lastWinner} win`}
+          match over
         </span>
       )}
-
-      <span className="mx-2 h-4 w-px bg-white/10" />
-      <button className="btn-danger" onClick={reset}>New City</button>
+      <span className="mx-1 h-4 w-px bg-white/10" />
+      <button className="btn-danger" onClick={reset}>Leave</button>
     </div>
   );
 }

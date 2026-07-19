@@ -5,14 +5,5 @@ export const API_BASE =
 export const WS_BASE =
   import.meta.env.VITE_WS_BASE ?? "ws://localhost:8080/ws/game";
 
-/** Fixed 8-operative roster for the demo match the backend creates (2 Shadows hidden among them). */
-export const DEMO_PLAYERS = [
-  { id: "p1", name: "Vex" },
-  { id: "p2", name: "Nyx" },
-  { id: "p3", name: "Mara" },
-  { id: "p4", name: "Dax" },
-  { id: "p5", name: "Ilya" },
-  { id: "p6", name: "Juno" },
-  { id: "p7", name: "Rook" },
-  { id: "p8", name: "Echo" },
-] as const;
+/** Fewest players a room can start with (mirrors the backend RoleDealer.MIN_PLAYERS). */
+export const MIN_PLAYERS = 3;
