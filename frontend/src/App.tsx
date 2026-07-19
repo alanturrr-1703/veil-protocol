@@ -14,6 +14,7 @@ import { Timeline } from "./components/game/Timeline";
 import { EvidenceBoard } from "./components/game/DayPhase";
 import { RoleReveal } from "./components/game/RoleReveal";
 import { NightOverlay } from "./components/game/NightPhase";
+import { VictoryOverlay } from "./components/game/VictoryOverlay";
 import { NPCDialogue } from "./components/npc/NPCDialogue";
 import { DirectorControls } from "./components/game/DirectorControls";
 import { ChatPanel } from "./components/chat/ChatPanel";
@@ -232,6 +233,7 @@ function GameScreen({ send }: { send: ReturnType<typeof useWebSocket>["send"] })
     <div className="min-h-screen p-4">
       <RoleReveal />
       <NightOverlay />
+      <VictoryOverlay />
 
       <header className="mb-4 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-4">
