@@ -65,6 +65,20 @@ npm run dev:frontend
 npm run demo:midnight      # prints roles staying hidden while moves stay verifiable
 ```
 
+### Real confidential referee (relayer)
+
+By default the backend uses an in-process mock confidential layer. To route confidential
+state through the **Midnight relayer** instead — the sidecar that submits transactions on
+players' behalf — run the relayer and start the backend on the `midnight` profile:
+
+```bash
+npm --workspace @veil/midnight run relayer                              # relayer :6301
+mvn -f backend/pom.xml spring-boot:run -Dspring-boot.run.profiles=midnight
+```
+
+The relayer ships in local commitment mode (no toolchain) and runs end-to-end today; see
+[docs/testnet-deployment.md](docs/testnet-deployment.md) to point it at Midnight testnet.
+
 ## Documentation
 
 - [docs/architecture-v3.md](docs/architecture-v3.md) — final hybrid architecture (start here)
