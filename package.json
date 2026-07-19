@@ -12,6 +12,9 @@
     "build:frontend": "npm --workspace frontend run build",
     "demo:midnight": "npm --workspace @veil/midnight run demo",
     "dev:backend": "mvn -f backend/pom.xml spring-boot:run",
-    "build:backend": "mvn -f backend/pom.xml -DskipTests package"
+    "build:backend": "mvn -f backend/pom.xml -DskipTests package",
+    "relayer": "npm --workspace @veil/midnight run relayer",
+    "test:backend": "mvn -f backend/pom.xml test",
+    "test:e2e": "node tests/e2e/room-flow.mjs"
   }
 }
