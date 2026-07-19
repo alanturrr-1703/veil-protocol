@@ -6,9 +6,12 @@ import com.veil.domain.npc.NPC;
 import com.veil.domain.npc.Observation;
 import com.veil.domain.player.Player;
 import com.veil.engine.GameContext;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -17,17 +20,31 @@ import java.util.concurrent.Executors;
  * humans — the AI never plays a role, takes a night action, chats, or votes.
  *
  * <p>The engine decides the FACTS (the observations an NPC actually witnessed, already scoped
- * to the asker); Ollama only phrases them. Because the facts are deterministic, two players
- * asking the same NPC the same question get the same answer. The model is given ONLY those
- * observations — never whole game state — and is guard-railed so it can't invent facts,
- * accuse anyone of being a Shadow, reveal a role, or name a killer with certainty.
+ * to the asker); Ollama only phrases them. Determinism is enforced three ways so two players
+ * asking the same NPC the same thing get the SAME answer: (1) memory-scoped facts, (2) a cache
+ * keyed by {@code (npc, asker, topic, memoryVersion)} that auto-invalidates when the NPC learns
+ * something new, and (3) greedy decoding (temperature 0 + a stable seed). The model is given
+ * ONLY those observations — never whole game state — and is guard-railed so it can't invent
+ * facts, accuse anyone of being a Shadow, reveal a role, or name a killer with certainty.
  */
 @Service
 public class AiEngine {
 
-    private final OllamaClient ollama = new OllamaClient("http://localhost:11434", "llama3.2:3b");
+    /** Words that would demand secret knowledge an NPC provably cannot have. */
+    private static final String[] ROLE_WORDS = {
+            "shadow", "oracle", "aegis", "citizen", "role", "faction", "alignment", "traitor", "killer"
+    };
+
+    private final OllamaClient ollama;
     // LLM calls are slow; run them off the engine thread so play never blocks on the model.
     private final ExecutorService pool = Executors.newFixedThreadPool(4);
+    // Deterministic answer cache: (npcId|askerId|topic|memoryVersion) -> phrased reply.
+    private final Map<String, String> cache = new ConcurrentHashMap<>();
+
+    public AiEngine(@Value("${veil.ollama.url:http://localhost:11434}") String ollamaUrl,
+                    @Value("${veil.ollama.model:llama3.2:3b}") String model) {
+        this.ollama = new OllamaClient(ollamaUrl, model);
+    }
 
     /**
      * A player talks to an NPC in their room. Records the question, then (asynchronously)
@@ -44,14 +61,24 @@ public class AiEngine {
         String question = topic == null || topic.isBlank() ? "what did you see" : topic.trim();
         session.postNpcLine(askerId, asker.displayName(), npcId, "(to " + npc.displayName() + ") " + question);
 
+        // Secret-knowledge questions are refused deterministically, before any memory lookup:
+        // an NPC can NEVER know a role/faction/culprit, so no phrasing model is even consulted.
+        if (isRoleQuestion(question)) {
+            session.postNpcLine(npcId, npc.displayName(), askerId,
+                    "I've no idea who's a Shadow or what anyone truly is. I only know what I saw with my own eyes.");
+            return;
+        }
+
+        int version = npc.memory().version();
         List<Observation> shared = npc.recall(question, askerId);
         pool.submit(() -> {
-            String reply = npcSpeak(ctx, npc, question, shared);
+            String key = npcId + "|" + askerId + "|" + question.toLowerCase() + "|v" + version;
+            String reply = cache.computeIfAbsent(key, k -> npcSpeak(ctx, npc, question, shared, k));
             session.postNpcLine(npcId, npc.displayName(), askerId, reply);
         });
     }
 
-    private String npcSpeak(GameContext ctx, NPC npc, String question, List<Observation> shared) {
+    private String npcSpeak(GameContext ctx, NPC npc, String question, List<Observation> shared, String cacheKey) {
         StringBuilder facts = new StringBuilder();
         for (Observation o : shared) facts.append("- ").append(describeObs(ctx, o)).append("\n");
 
@@ -69,7 +96,17 @@ public class AiEngine {
                         : "What you actually saw:\n" + facts)
                 + "Answer in ONE or TWO short in-character sentences using ONLY what you saw. "
                 + "Reply with only the words you say.";
-        return oneLine(ollama.generate(prompt, fallback, 80, 0.7));
+        // temperature 0 + a stable per-(npc,asker,topic,version) seed => identical phrasing every time.
+        return oneLine(ollama.generate(prompt, fallback, 80, 0.0, cacheKey.hashCode()));
+    }
+
+    private static boolean isRoleQuestion(String topic) {
+        if (topic == null) return false;
+        String t = topic.toLowerCase();
+        for (String w : ROLE_WORDS) {
+            if (t.contains(w)) return true;
+        }
+        return false;
     }
 
     private String describeObs(GameContext ctx, Observation o) {

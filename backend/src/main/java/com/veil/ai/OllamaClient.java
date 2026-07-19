@@ -33,18 +33,25 @@ public class OllamaClient {
 
     /** Returns the generated text, or the fallback if the model is unreachable. */
     public String generate(String prompt, String fallback) {
-        return generate(prompt, fallback, 120, 0.8);
+        return generate(prompt, fallback, 120, 0.8, null);
+    }
+
+    public String generate(String prompt, String fallback, int maxTokens, double temperature) {
+        return generate(prompt, fallback, maxTokens, temperature, null);
     }
 
     /**
-     * Generate with a token cap and temperature so AI-player lines stay short and snappy.
-     * Always returns the fallback on any error, so the game never blocks on the model.
+     * Generate with a token cap, temperature, and optional seed. Passing {@code temperature = 0}
+     * with a fixed {@code seed} makes decoding DETERMINISTIC: the same prompt yields the same
+     * text, so an NPC phrases the same witnessed facts identically for every asker. Always
+     * returns the fallback on any error, so the game never blocks on the model.
      */
-    public String generate(String prompt, String fallback, int maxTokens, double temperature) {
+    public String generate(String prompt, String fallback, int maxTokens, double temperature, Integer seed) {
         try {
+            String opts = "\"num_predict\":" + maxTokens + ",\"temperature\":" + temperature;
+            if (seed != null) opts += ",\"seed\":" + seed;
             String body = "{\"model\":\"" + model + "\",\"prompt\":\"" + escape(prompt)
-                    + "\",\"stream\":false,\"options\":{\"num_predict\":" + maxTokens
-                    + ",\"temperature\":" + temperature + "}}";
+                    + "\",\"stream\":false,\"options\":{" + opts + "}}";
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(baseUrl + "/api/generate"))
                     .timeout(Duration.ofSeconds(30))
